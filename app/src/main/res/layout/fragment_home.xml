@@ -97,6 +97,18 @@
                     android:text="今日無清運"
                     android:textSize="14sp" />
 
+                <TextView
+                    android:id="@+id/tvArriveTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="抵達時間：" />
+
+                <TextView
+                    android:id="@+id/tvLeaveTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="離開時間：" />
+
                 <com.google.android.gms.maps.MapView
                     android:id="@+id/mapView"
                     android:layout_width="match_parent"
