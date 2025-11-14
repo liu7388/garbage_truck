@@ -1,6 +1,7 @@
 package com.example.garbage_truck
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.os.Bundle
@@ -19,10 +20,12 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import android.provider.CalendarContract
 import java.io.IOException
 import java.util.Locale
 import okhttp3.*
 import org.json.JSONObject
+import androidx.appcompat.app.AlertDialog
 
 class HomeFragment : Fragment(), OnMapReadyCallback {
 
@@ -95,6 +98,28 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         binding.tvTemperature.text = "30°C"
         binding.tvNearestSub.text = "..."
 
+        binding.btnRemind.setOnClickListener {
+            // 先讓使用者確認要不要加通知到行事曆
+            AlertDialog.Builder(requireContext())
+                .setTitle("新增提醒")
+                .setMessage("要將 ${nearestPointName} 的垃圾車抵達時間加到行事曆嗎？")
+                .setPositiveButton("確定") { _, _ ->
+                    val startMillis = parseTimeToMillis(nearestArrive) // 自己轉換抵達時間
+                    val endMillis = startMillis + 15 * 60 * 1000 // 預設 15 分鐘結束
+
+                    val intent = Intent(Intent.ACTION_INSERT).apply {
+                        data = CalendarContract.Events.CONTENT_URI
+                        putExtra(CalendarContract.Events.TITLE, "垃圾車抵達提醒")
+                        putExtra(CalendarContract.Events.EVENT_LOCATION, nearestPointName)
+                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startMillis)
+                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endMillis)
+                    }
+                    startActivity(intent)
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
     }
 
     override fun onMapReady(map: GoogleMap) {
@@ -107,6 +132,17 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
+    }
+
+    private fun parseTimeToMillis(time: String): Long {
+        // 今天日期 + time
+        val now = java.util.Calendar.getInstance()
+        val hour = time.substring(0, 2).toInt()
+        val min = time.substring(2, 4).toInt()
+        now.set(java.util.Calendar.HOUR_OF_DAY, hour)
+        now.set(java.util.Calendar.MINUTE, min)
+        now.set(java.util.Calendar.SECOND, 0)
+        return now.timeInMillis
     }
 
     private fun enableMyLocation() {
@@ -136,7 +172,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                             val currentLatLng = LatLng(lat, lng)
 
                             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
-                            googleMap.clear()
+                            updateAddress(lat, lng)
                             updateCityName(lat, lng)
 
                             fetchNearestGarbagePoint(lat, lng)
