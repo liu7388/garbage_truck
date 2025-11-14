@@ -1,0 +1,46 @@
+# --------------------
+# 1. Gradle/Build System 相關
+# --------------------
+/build
+*/build/
+
+.gradle/
+/local.properties
+/gradle-wrapper.jar
+!/gradle/wrapper/gradle-wrapper.jar # 保留 wrapper 腳本，但不保留 JAR
+.kotlin/
+kotlin-gradle-plugin/
+
+# --------------------
+# 2. IDE 相關 (Android Studio/IntelliJ)
+# --------------------
+*.iml
+.idea/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# --------------------
+# 3. 編譯產物 / 輸出檔案
+# --------------------
+# 應用程式包
+*.apk
+*.aab
+# 捕捉器與快取
+/captures
+output.json
+
+# --------------------
+# 4. Native/NDK 相關 (如果專案使用 C/C++)
+# --------------------
+.cxx/
+.externalNativeBuild/
+
+# --------------------
+# 5. OS/系統檔案
+# --------------------
+.DS_Store # macOS
+Thumbs.db # Windows
