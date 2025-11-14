@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    xmlns:tools="http://schemas.android.com/tools"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.example.garbage_truck.MapFragment"
+        android:label="周邊清運點"
+        tools:layout="@layout/fragment_map" />
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.example.garbage_truck.HomeFragment"
+        android:label="垃圾車清運查詢"
+        tools:layout="@layout/fragment_home" />
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.example.garbage_truck.SettingsFragment"
+        android:label="設定"
+        tools:layout="@layout/fragment_settings" />
+</navigation>
