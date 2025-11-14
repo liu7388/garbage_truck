@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -25,12 +26,16 @@ import java.io.IOException
 import java.util.Locale
 import okhttp3.*
 import org.json.JSONObject
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 
 class HomeFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+
+    private lateinit var tvArriveTime: TextView
+    private lateinit var tvLeaveTime: TextView
 
     private lateinit var googleMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -99,11 +104,12 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         binding.tvNearestSub.text = "..."
 
         binding.btnRemind.setOnClickListener {
-            // 先讓使用者確認要不要加通知到行事曆
+            // 這裡可以先讓使用者確認要不要加
             AlertDialog.Builder(requireContext())
                 .setTitle("新增提醒")
                 .setMessage("要將 ${nearestPointName} 的垃圾車抵達時間加到行事曆嗎？")
                 .setPositiveButton("確定") { _, _ ->
+                    // 轉換抵達時間字串 → millis (這裡假設你有一個函式 parseTimeToMillis)
                     val startMillis = parseTimeToMillis(nearestArrive) // 自己轉換抵達時間
                     val endMillis = startMillis + 15 * 60 * 1000 // 預設 15 分鐘結束
 
@@ -120,6 +126,16 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 .show()
         }
 
+        binding.btnMap.setOnClickListener {
+            nearestPointLatLng?.let { latLng ->
+                val uri = Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}&walk=w")
+                val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+                mapIntent.setPackage("com.google.android.apps.maps")
+                startActivity(mapIntent)
+            } ?: run {
+                Toast.makeText(requireContext(), "尚未取得最近清運點", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     override fun onMapReady(map: GoogleMap) {
@@ -172,7 +188,9 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                             val currentLatLng = LatLng(lat, lng)
 
                             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
-                            updateAddress(lat, lng)
+                            googleMap.clear()
+//                            googleMap.addMarker(MarkerOptions().position(currentLatLng).title("目前位置"))
+//                            updateAddress(lat, lng)
                             updateCityName(lat, lng)
 
                             fetchNearestGarbagePoint(lat, lng)
