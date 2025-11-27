@@ -9,10 +9,31 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import androidx.navigation.ui.setupWithNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.core.app.ActivityCompat
+import android.Manifest
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
+
 
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 🔹 必須在 super.onCreate 之前設定，才會馬上套用主題
+        val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val darkModeOn = prefs.getBoolean("dark_mode", false)
+        val rememberDarkMode = prefs.getBoolean("remember_dark_mode", true)
+
+        if (rememberDarkMode) {
+            if (darkModeOn) {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            } else {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            }
+        } else {
+            // 如果不記憶就讓系統自己決定
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -37,8 +58,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fab.setOnClickListener {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+            100
+        )
 
+        fab.setOnClickListener {
+            val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
+            val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+            if (currentFragment is MapFragment) {
+                currentFragment.moveToMyLocation()
+            }
         }
     }
 }

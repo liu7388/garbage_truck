@@ -7,7 +7,6 @@ import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
 import android.provider.CalendarContract
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -29,11 +28,6 @@ import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
 import java.util.*
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.Locale
 
 class HomeFragment : Fragment(), OnMapReadyCallback {
 
@@ -72,14 +66,14 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 val address = addresses[0]
                 val street = address.thoroughfare ?: address.getAddressLine(0) ?: "未知道路"
                 requireActivity().runOnUiThread {
-                    _binding?.cardNearest?.tvNearestSub?.text = street
+                    _binding?.tvNearestSub?.text = street
                 }
             } else {
-                _binding?.cardNearest?.tvNearestSub?.text = "無法取得地址"
+                _binding?.tvNearestSub?.text = "無法取得地址"
             }
         } catch (e: IOException) {
             e.printStackTrace()
-            _binding?.cardNearest?.tvNearestSub?.text = "無法取得地址"
+            _binding?.tvNearestSub?.text = "無法取得地址"
         }
     }
 
@@ -95,16 +89,16 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.cardNearest.mapView.onCreate(savedInstanceState)
-        binding.cardNearest.mapView.getMapAsync(this)
+        binding.mapView.onCreate(savedInstanceState)
+        binding.mapView.getMapAsync(this)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
         binding.tvCity.text = "定位中…"
         binding.tvTemperature.text = "30°C"
-        binding.cardNearest.tvNearestSub.text = "..."
+        binding.tvNearestSub.text = "..."
 
-        binding.cardNearest.btnRemind.setOnClickListener {
+        binding.btnRemind.setOnClickListener {
             AlertDialog.Builder(requireContext())
                 .setTitle("新增提醒")
                 .setMessage("要將 ${nearestPointName} 的垃圾車抵達時間加到行事曆嗎？")
@@ -124,7 +118,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 .show()
         }
 
-        binding.cardNearest.btnMap.setOnClickListener {
+        binding.btnMap.setOnClickListener {
             nearestPointLatLng?.let { latLng ->
                 val uri = Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}&walk=w")
                 val mapIntent = Intent(Intent.ACTION_VIEW, uri)
@@ -188,104 +182,12 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                             googleMap.clear()
                             updateCityName(lat, lng)
                             fetchNearestGarbagePoint(lat, lng)
-                            fetchWeather(lat, lng)
                         }
                         fusedLocationClient.removeLocationUpdates(this)
                     }
                 },
                 requireActivity().mainLooper
             )
-        }
-    }
-
-    private fun fetchWeather(lat: Double, lng: Double) {
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val geocoder = Geocoder(requireContext(), Locale.TAIWAN)
-                val addresses = geocoder.getFromLocation(lat, lng, 1)
-                val address = addresses?.firstOrNull()
-
-                // 印出 geocoder 回傳內容
-                Log.d("WeatherAPI", "adminArea=${address?.adminArea}, locality=${address?.locality}, full=${address}")
-
-                var cityName = address?.adminArea ?: address?.locality ?: ""
-
-                cityName = cityName.replace("台", "臺")
-
-                withContext(Dispatchers.Main) {
-                    binding.tvCity.text = cityName
-                }
-
-                // 讀取 API 金鑰
-                val appInfo = requireContext().packageManager
-                    .getApplicationInfo(requireContext().packageName, PackageManager.GET_META_DATA)
-                val weatherApiKey = appInfo.metaData.getString("com.example.garbage_truck.WEATHER_API_KEY")
-
-                Log.d("WeatherAPI", "weatherApiKey=$weatherApiKey")
-
-                // 組 URL
-                val url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=$weatherApiKey"
-                Log.d("WeatherAPI", "Request URL=$url")
-
-                val client = OkHttpClient()
-                val request = Request.Builder().url(url).build()
-                val response = client.newCall(request).execute()
-                val body = response.body?.string() ?: return@launch
-
-                Log.d("WeatherAPI", "Response first 300 chars=${body.take(300)}")
-
-                val json = JSONObject(body)
-                val records = json.getJSONObject("records")
-                val locations = records.getJSONArray("location")
-
-                var found = false
-                for (i in 0 until locations.length()) {
-                    val locationObj = locations.getJSONObject(i)
-                    val locationName = locationObj.getString("locationName")
-                    if (cityName.contains(locationName)) {
-                        val weatherElements = locationObj.getJSONArray("weatherElement")
-
-                        val wxArray = weatherElements.getJSONObject(0).getJSONArray("time")
-                        val minTArray = weatherElements.getJSONObject(2).getJSONArray("time")
-
-                        val currentWx = wxArray.getJSONObject(0)
-                            .getJSONObject("parameter").getString("parameterName")
-                        val currentMinT = minTArray.getJSONObject(0)
-                            .getJSONObject("parameter").getString("parameterName")
-
-                        withContext(Dispatchers.Main) {
-                            binding.tvCity.text = locationName
-                            binding.tvTemperature.text = "${currentMinT}°C"
-                            binding.tvWeather.text = currentWx
-
-                            val wxText = currentWx.trim() // 移除多餘空白
-                            val iconRes = when {
-                                wxText.contains("雷") -> R.drawable.ic_weather_thunder
-                                wxText.contains("雨") -> R.drawable.ic_weather_rainy
-                                wxText.contains("陰") -> R.drawable.ic_weather_cloudy
-                                wxText.contains("多雲") -> R.drawable.ic_day_cloudy
-                                wxText.contains("晴") -> R.drawable.ic_weather_sunny
-                                else -> R.drawable.ic_weather // 預設
-                            }
-                            binding.ivWeather.setImageResource(iconRes)
-                        }
-                        found = true
-                        break
-                    }
-                }
-
-                if (!found) {
-                    Log.w("WeatherAPI", "找不到對應城市：$cityName")
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(requireContext(), "找不到對應城市的天氣資料", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("WeatherAPI", "Error", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "取得天氣資料失敗", Toast.LENGTH_SHORT).show()
-                }
-            }
         }
     }
 
@@ -341,8 +243,8 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                             .title("最近清運點：$nearestName")
                     )
                     updateAddress(nearestLat, nearestLng)
-                    _binding?.cardNearest?.tvArriveTime?.text = "抵達時間：${formatTime(arrive)}"
-                    _binding?.cardNearest?.tvLeaveTime?.text = "離開時間：${formatTime(leave)}"
+                    _binding?.tvArriveTime?.text = "抵達時間：${formatTime(arrive)}"
+                    _binding?.tvLeaveTime?.text = "離開時間：${formatTime(leave)}"
                 }
             }
         })
@@ -357,7 +259,6 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun updateCityName(lat: Double, lng: Double) {
-        if (!isAdded) return
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
         try {
             val addresses = geocoder.getFromLocation(lat, lng, 1)
@@ -374,27 +275,27 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        _binding?.cardNearest?.mapView?.onResume()
+        _binding?.mapView?.onResume()
     }
 
     override fun onPause() {
         super.onPause()
-        _binding?.cardNearest?.mapView?.onPause()
+        _binding?.mapView?.onPause()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding?.cardNearest?.mapView?.onDestroy()
+        _binding?.mapView?.onDestroy()
         _binding = null
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
-        _binding?.cardNearest?.mapView?.onLowMemory()
+        _binding?.mapView?.onLowMemory()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        _binding?.cardNearest?.mapView?.onSaveInstanceState(outState)
+        _binding?.mapView?.onSaveInstanceState(outState)
     }
 }
