@@ -6,11 +6,13 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
+import android.provider.CalendarContract
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import com.example.garbage_truck.databinding.FragmentHomeBinding
@@ -21,8 +23,10 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import okhttp3.*
+import org.json.JSONObject
 import java.io.IOException
-import java.util.Locale
+import java.util.*
 
 class HomeFragment : Fragment(), OnMapReadyCallback {
 
@@ -31,6 +35,11 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var googleMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private var nearestPointLatLng: LatLng? = null
+    private var nearestPointName: String = ""
+    private var nearestArrive: String = ""
+    private var nearestLeave: String = ""
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -46,19 +55,26 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun updateAddress(lat: Double, lng: Double) {
+        if (!isAdded) return
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
         try {
             val addresses = geocoder.getFromLocation(lat, lng, 1)
-            if (!addresses.isNullOrEmpty()) {
+            if (addresses?.isNotEmpty() == true) {
                 val address = addresses[0]
                 val street = address.thoroughfare ?: address.getAddressLine(0) ?: "未知道路"
-                binding.tvNearestSub.text = street
+                activity?.runOnUiThread {
+                    _binding?.tvNearestSub?.text = street
+                }
             } else {
-                binding.tvNearestSub.text = "無法取得地址"
+                activity?.runOnUiThread {
+                    _binding?.tvNearestSub?.text = "無法取得地址"
+                }
             }
         } catch (e: IOException) {
             e.printStackTrace()
-            binding.tvNearestSub.text = "無法取得地址"
+            activity?.runOnUiThread {
+                _binding?.tvNearestSub?.text = "無法取得地址"
+            }
         }
     }
 
@@ -81,18 +97,42 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
         binding.tvCity.text = "定位中…"
         binding.tvTemperature.text = "30°C"
-        binding.tvNearestSub.text = ""
+        binding.tvNearestSub.text = "..."
 
         binding.btnRemind.setOnClickListener {
-            Toast.makeText(requireContext(), "提醒按鈕被點擊", Toast.LENGTH_SHORT).show()
+            if (nearestPointName.isEmpty() || nearestArrive.isEmpty()) {
+                Toast.makeText(requireContext(), "尚未取得清運點資訊", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            AlertDialog.Builder(requireContext())
+                .setTitle("新增提醒")
+                .setMessage("要將 ${nearestPointName} 的垃圾車抵達時間加到行事曆嗎？")
+                .setPositiveButton("確定") { _, _ ->
+                    val startMillis = parseTimeToMillis(nearestArrive)
+                    val endMillis = parseTimeToMillis(nearestLeave).let { if (it > startMillis) it else startMillis + 15 * 60 * 1000 }
+
+                    val intent = Intent(Intent.ACTION_INSERT).apply {
+                        data = CalendarContract.Events.CONTENT_URI
+                        putExtra(CalendarContract.Events.TITLE, "垃圾車抵達提醒: $nearestPointName")
+                        putExtra(CalendarContract.Events.EVENT_LOCATION, nearestPointName)
+                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startMillis)
+                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endMillis)
+                    }
+                    startActivity(intent)
+                }
+                .setNegativeButton("取消", null)
+                .show()
         }
 
         binding.btnMap.setOnClickListener {
-            val gmmIntentUri =
-                Uri.parse("geo:25.0330,121.5654?q=25.0330,121.5654(最近清運點)")
-            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-            mapIntent.setPackage("com.google.android.apps.maps")
-            startActivity(mapIntent)
+            nearestPointLatLng?.let { latLng ->
+                val uri = Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}&mode=w")
+                val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+                mapIntent.setPackage("com.google.android.apps.maps")
+                startActivity(mapIntent)
+            } ?: run {
+                Toast.makeText(requireContext(), "尚未取得最近清運點", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -108,60 +148,133 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         )
     }
 
+    private fun parseTimeToMillis(time: String): Long {
+        if (time.length != 4) return System.currentTimeMillis()
+        val now = Calendar.getInstance()
+        val hour = time.substring(0, 2).toIntOrNull() ?: now.get(Calendar.HOUR_OF_DAY)
+        val min = time.substring(2, 4).toIntOrNull() ?: now.get(Calendar.MINUTE)
+        now.set(Calendar.HOUR_OF_DAY, hour)
+        now.set(Calendar.MINUTE, min)
+        now.set(Calendar.SECOND, 0)
+        now.set(Calendar.MILLISECOND, 0)
+        return now.timeInMillis
+    }
+
     private fun enableMyLocation() {
         if (ActivityCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED ||
-            ActivityCompat.checkSelfPermission(
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+            ) != PackageManager.PERMISSION_GRANTED
         ) {
-            googleMap.isMyLocationEnabled = true
+            return
+        }
+        googleMap.isMyLocationEnabled = true
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val lat = location.latitude
+                val lng = location.longitude
+                val currentLatLng = LatLng(lat, lng)
 
-            val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
-                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, 2000
-            ).setMaxUpdates(1).build()
-
-            fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                object : com.google.android.gms.location.LocationCallback() {
-                    override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
-                        val location = result.lastLocation
-                        if (location != null) {
-                            val lat = location.latitude
-                            val lng = location.longitude
-
-                            val currentLatLng = LatLng(lat, lng)
-                            // 直接把地圖鏡頭移到目前位置
-                            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
-                            // 如果要標記可以加 Marker
-                            googleMap.clear()
-                            googleMap.addMarker(MarkerOptions().position(currentLatLng).title("目前位置"))
-                            updateAddress(lat, lng)
-                            updateCityName(lat, lng)
-                        }
-                        fusedLocationClient.removeLocationUpdates(this)
-                    }
-                },
-                requireActivity().mainLooper
-            )
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
+                updateCityName(lat, lng)
+                fetchNearestGarbagePoint(lat, lng)
+            }
         }
     }
 
+    private fun fetchNearestGarbagePoint(myLat: Double, myLng: Double) {
+        val client = OkHttpClient()
+        val url =
+            "https://data.taipei/api/v1/dataset/a6e90031-7ec4-4089-afb5-361a4efe7202?scope=resourceAquire&limit=1000"
+        val request = Request.Builder().url(url).build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                e.printStackTrace()
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                if (_binding == null) return
+                val body = response.body?.string() ?: return
+                val json = JSONObject(body)
+                val results = json.getJSONObject("result").getJSONArray("results")
+
+                var minDistance = Float.MAX_VALUE
+                var nearestLat = 0.0
+                var nearestLng = 0.0
+                var nearestName = ""
+                var arrive = ""
+                var leave = ""
+
+                for (i in 0 until results.length()) {
+                    val item = results.getJSONObject(i)
+                    val lat = item.getString("緯度").toDoubleOrNull() ?: continue
+                    val lng = item.getString("經度").toDoubleOrNull() ?: continue
+                    val title = item.getString("地點")
+                    val arriveTime = item.optString("抵達時間", "")
+                    val leaveTime = item.optString("離開時間", "")
+
+                    val distance = FloatArray(1)
+                    android.location.Location.distanceBetween(myLat, myLng, lat, lng, distance)
+                    if (distance[0] < minDistance) {
+                        minDistance = distance[0]
+                        nearestLat = lat
+                        nearestLng = lng
+                        nearestName = title
+                        arrive = arriveTime
+                        leave = leaveTime
+                    }
+                }
+
+                activity?.runOnUiThread {
+                    if (_binding == null) return@runOnUiThread
+                    nearestPointLatLng = LatLng(nearestLat, nearestLng)
+                    nearestPointName = nearestName
+                    nearestArrive = arrive
+                    nearestLeave = leave
+
+                    googleMap.addMarker(
+                        MarkerOptions().position(nearestPointLatLng!!)
+                            .title("最近清運點：$nearestName")
+                    )
+
+                    updateAddress(nearestLat, nearestLng)
+
+                    binding.tvArriveTime.text = "抵達時間：${formatTime(arrive)}"
+                    binding.tvLeaveTime.text = "離開時間：${formatTime(leave)}"
+                }
+            }
+        })
+    }
+
+    private fun formatTime(time: String): String {
+        return if (time.length == 4) {
+            val hour = time.substring(0, 2)
+            val min = time.substring(2, 4)
+            "$hour:$min"
+        } else time
+    }
+
     private fun updateCityName(lat: Double, lng: Double) {
+        if (!isAdded) return
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
         try {
             val addresses = geocoder.getFromLocation(lat, lng, 1)
-            if (!addresses.isNullOrEmpty()) {
+            if (addresses?.isNotEmpty() == true) {
                 val address = addresses[0]
                 val city = address.adminArea ?: address.locality ?: "未知地點"
-                binding.tvCity.text = city
+                activity?.runOnUiThread {
+                    _binding?.tvCity?.text = city
+                }
             }
         } catch (e: IOException) {
             e.printStackTrace()
-            Toast.makeText(requireContext(), "無法取得城市名稱", Toast.LENGTH_SHORT).show()
+            activity?.runOnUiThread {
+                Toast.makeText(context, "無法取得城市名稱", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -178,6 +291,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     override fun onDestroyView() {
         super.onDestroyView()
         binding.mapView.onDestroy()
+        googleMap.clear()
         _binding = null
     }
 
