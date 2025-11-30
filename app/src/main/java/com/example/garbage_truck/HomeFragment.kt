@@ -6,14 +6,11 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
-import android.provider.CalendarContract
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import com.example.garbage_truck.databinding.FragmentHomeBinding
@@ -24,26 +21,16 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import okhttp3.*
-import org.json.JSONObject
 import java.io.IOException
-import java.util.*
+import java.util.Locale
 
 class HomeFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    private lateinit var tvArriveTime: TextView
-    private lateinit var tvLeaveTime: TextView
-
     private lateinit var googleMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-
-    private var nearestPointLatLng: LatLng? = null
-    private var nearestPointName: String = ""
-    private var nearestArrive: String = ""
-    private var nearestLeave: String = ""
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -65,15 +52,13 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             if (!addresses.isNullOrEmpty()) {
                 val address = addresses[0]
                 val street = address.thoroughfare ?: address.getAddressLine(0) ?: "未知道路"
-                requireActivity().runOnUiThread {
-                    _binding?.tvNearestSub?.text = street
-                }
+                binding.tvNearestSub.text = street
             } else {
-                _binding?.tvNearestSub?.text = "無法取得地址"
+                binding.tvNearestSub.text = "無法取得地址"
             }
         } catch (e: IOException) {
             e.printStackTrace()
-            _binding?.tvNearestSub?.text = "無法取得地址"
+            binding.tvNearestSub.text = "無法取得地址"
         }
     }
 
@@ -96,61 +81,31 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
         binding.tvCity.text = "定位中…"
         binding.tvTemperature.text = "30°C"
-        binding.tvNearestSub.text = "..."
+        binding.tvNearestSub.text = ""
 
         binding.btnRemind.setOnClickListener {
-            AlertDialog.Builder(requireContext())
-                .setTitle("新增提醒")
-                .setMessage("要將 ${nearestPointName} 的垃圾車抵達時間加到行事曆嗎？")
-                .setPositiveButton("確定") { _, _ ->
-                    val startMillis = parseTimeToMillis(nearestArrive)
-                    val endMillis = startMillis + 15 * 60 * 1000
-                    val intent = Intent(Intent.ACTION_INSERT).apply {
-                        data = CalendarContract.Events.CONTENT_URI
-                        putExtra(CalendarContract.Events.TITLE, "垃圾車抵達提醒")
-                        putExtra(CalendarContract.Events.EVENT_LOCATION, nearestPointName)
-                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startMillis)
-                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endMillis)
-                    }
-                    startActivity(intent)
-                }
-                .setNegativeButton("取消", null)
-                .show()
+            Toast.makeText(requireContext(), "提醒按鈕被點擊", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnMap.setOnClickListener {
-            nearestPointLatLng?.let { latLng ->
-                val uri = Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}&walk=w")
-                val mapIntent = Intent(Intent.ACTION_VIEW, uri)
-                mapIntent.setPackage("com.google.android.apps.maps")
-                startActivity(mapIntent)
-            } ?: run {
-                Toast.makeText(requireContext(), "尚未取得最近清運點", Toast.LENGTH_SHORT).show()
-            }
+            val gmmIntentUri =
+                Uri.parse("geo:25.0330,121.5654?q=25.0330,121.5654(最近清運點)")
+            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+            mapIntent.setPackage("com.google.android.apps.maps")
+            startActivity(mapIntent)
         }
     }
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
         googleMap.uiSettings.isMyLocationButtonEnabled = true
+
         locationPermissionRequest.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
-    }
-
-    private fun parseTimeToMillis(time: String): Long {
-        val now = Calendar.getInstance()
-        if (time.length == 4) {
-            val hour = time.substring(0, 2).toInt()
-            val min = time.substring(2, 4).toInt()
-            now.set(Calendar.HOUR_OF_DAY, hour)
-            now.set(Calendar.MINUTE, min)
-            now.set(Calendar.SECOND, 0)
-        }
-        return now.timeInMillis
     }
 
     private fun enableMyLocation() {
@@ -177,11 +132,15 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                         if (location != null) {
                             val lat = location.latitude
                             val lng = location.longitude
+
                             val currentLatLng = LatLng(lat, lng)
+                            // 直接把地圖鏡頭移到目前位置
                             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
+                            // 如果要標記可以加 Marker
                             googleMap.clear()
+                            googleMap.addMarker(MarkerOptions().position(currentLatLng).title("目前位置"))
+                            updateAddress(lat, lng)
                             updateCityName(lat, lng)
-                            fetchNearestGarbagePoint(lat, lng)
                         }
                         fusedLocationClient.removeLocationUpdates(this)
                     }
@@ -191,73 +150,6 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    private fun fetchNearestGarbagePoint(myLat: Double, myLng: Double) {
-        val client = OkHttpClient()
-        val url =
-            "https://data.taipei/api/v1/dataset/a6e90031-7ec4-4089-afb5-361a4efe7202?scope=resourceAquire&limit=1000"
-        val request = Request.Builder().url(url).build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                e.printStackTrace()
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val body = response.body?.string() ?: return
-                val json = JSONObject(body)
-                val results = json.getJSONObject("result").getJSONArray("results")
-
-                var minDistance = Float.MAX_VALUE
-                var nearestLat = 0.0
-                var nearestLng = 0.0
-                var nearestName = ""
-                var arrive = ""
-                var leave = ""
-
-                for (i in 0 until results.length()) {
-                    val item = results.getJSONObject(i)
-                    val lat = item.getString("緯度").toDouble()
-                    val lng = item.getString("經度").toDouble()
-                    val title = item.getString("地點")
-                    val arriveTime = item.optString("抵達時間", "")
-                    val leaveTime = item.optString("離開時間", "")
-                    val distance = FloatArray(1)
-                    android.location.Location.distanceBetween(myLat, myLng, lat, lng, distance)
-                    if (distance[0] < minDistance) {
-                        minDistance = distance[0]
-                        nearestLat = lat
-                        nearestLng = lng
-                        nearestName = title
-                        arrive = arriveTime
-                        leave = leaveTime
-                    }
-                }
-
-                requireActivity().runOnUiThread {
-                    nearestPointLatLng = LatLng(nearestLat, nearestLng)
-                    nearestPointName = nearestName
-                    nearestArrive = arrive
-                    nearestLeave = leave
-                    googleMap.addMarker(
-                        MarkerOptions().position(nearestPointLatLng!!)
-                            .title("最近清運點：$nearestName")
-                    )
-                    updateAddress(nearestLat, nearestLng)
-                    _binding?.tvArriveTime?.text = "抵達時間：${formatTime(arrive)}"
-                    _binding?.tvLeaveTime?.text = "離開時間：${formatTime(leave)}"
-                }
-            }
-        })
-    }
-
-    private fun formatTime(time: String): String {
-        return if (time.length == 4) {
-            val hour = time.substring(0, 2)
-            val min = time.substring(2, 4)
-            "$hour:$min"
-        } else time
-    }
-
     private fun updateCityName(lat: Double, lng: Double) {
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
         try {
@@ -265,7 +157,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             if (!addresses.isNullOrEmpty()) {
                 val address = addresses[0]
                 val city = address.adminArea ?: address.locality ?: "未知地點"
-                _binding?.tvCity?.text = city
+                binding.tvCity.text = city
             }
         } catch (e: IOException) {
             e.printStackTrace()
@@ -275,27 +167,27 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        _binding?.mapView?.onResume()
+        binding.mapView.onResume()
     }
 
     override fun onPause() {
         super.onPause()
-        _binding?.mapView?.onPause()
+        binding.mapView.onPause()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding?.mapView?.onDestroy()
+        binding.mapView.onDestroy()
         _binding = null
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
-        _binding?.mapView?.onLowMemory()
+        binding.mapView.onLowMemory()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        _binding?.mapView?.onSaveInstanceState(outState)
+        binding.mapView.onSaveInstanceState(outState)
     }
 }
