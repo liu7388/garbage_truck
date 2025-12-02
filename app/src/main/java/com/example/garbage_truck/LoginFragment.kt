@@ -2,6 +2,7 @@ package com.example.garbage_truck
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -40,13 +41,32 @@ class LoginFragment : Fragment() {
         }
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        auth = FirebaseAuth.getInstance()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val pendingResultTask = auth.pendingAuthResult
+        if (pendingResultTask != null) {
+            pendingResultTask
+                .addOnSuccessListener { authResult ->
+                    Log.d("LOGIN", "User signed in: ${authResult.user?.email}")
+                    onLoginSuccess()
+                }
+                .addOnFailureListener { e ->
+                    Log.e("LOGIN", "Error: ${e.message}")
+                }
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         val view = inflater.inflate(R.layout.fragment_login, container, false)
 
-        auth = FirebaseAuth.getInstance()
         etEmail = view.findViewById(R.id.et_email)
         etPassword = view.findViewById(R.id.et_password)
 
@@ -59,6 +79,9 @@ class LoginFragment : Fragment() {
 
         // 按鈕監聽
         view.findViewById<Button>(R.id.btn_login_email).setOnClickListener { loginWithEmail() }
+        view.findViewById<Button>(R.id.btn_register).setOnClickListener {
+            findNavController().navigate(R.id.action_loginFragment_to_registerFragment)
+        }
         view.findViewById<Button>(R.id.btn_login_google).setOnClickListener {
             googleSignInLauncher.launch(googleSignInClient.signInIntent)
         }
@@ -107,7 +130,6 @@ class LoginFragment : Fragment() {
     // --- GitHub 登入 ---
     private fun loginWithGithub() {
         val provider = OAuthProvider.newBuilder("github.com")
-        // 如果需要，可以加 scopes: provider.addCustomParameter("login", "your_email@example.com")
 
         auth.startActivityForSignInWithProvider(requireActivity(), provider.build())
             .addOnSuccessListener { onLoginSuccess() }

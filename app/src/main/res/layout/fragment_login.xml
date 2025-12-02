@@ -38,6 +38,14 @@
         android:text="Email 登入"
         android:layout_marginTop="20dp" />
 
+    <Button
+        android:id="@+id/btn_register"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="還沒有帳號嗎？ 註冊一個"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_marginTop="10dp" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

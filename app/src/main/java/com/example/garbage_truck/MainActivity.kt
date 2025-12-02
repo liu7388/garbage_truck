@@ -13,9 +13,12 @@ import androidx.core.app.ActivityCompat
 import android.Manifest
 import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.navigation.NavController
 
 
 class MainActivity : AppCompatActivity() {
+
+    private lateinit var navController: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // 🔹 必須在 super.onCreate 之前設定，才會馬上套用主題
@@ -40,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        val navController = findNavController(R.id.nav_host_fragment)
+        navController = findNavController(R.id.nav_host_fragment)
         val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         val fab = findViewById<FloatingActionButton>(R.id.locationFab)
 
@@ -71,5 +74,9 @@ class MainActivity : AppCompatActivity() {
                 currentFragment.moveToMyLocation()
             }
         }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 }
