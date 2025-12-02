@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SwitchCompat
 import androidx.recyclerview.widget.RecyclerView
+import android.app.Activity
 
 class SettingsAdapter(private val items: List<SettingItem>) :
     RecyclerView.Adapter<SettingsAdapter.ViewHolder>() {
@@ -44,16 +45,17 @@ class SettingsAdapter(private val items: List<SettingItem>) :
                 "深色模式" -> {
                     prefs.edit().putBoolean("dark_mode", isChecked).apply()
 
-                    val remember = prefs.getBoolean("remember_dark_mode", false)
-                    if (remember) {
-                        if (isChecked) {
-                            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                        } else {
-                            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                        }
-                    }
+                    AppCompatDelegate.setDefaultNightMode(
+                        if (isChecked) AppCompatDelegate.MODE_NIGHT_YES
+                        else AppCompatDelegate.MODE_NIGHT_NO
+                    )
+
+                    val activity = (context as? Activity)
+                    activity?.recreate()
                 }
+
                 "是否記憶深色模式" -> {
+                    // 記錄要不要記憶
                     prefs.edit().putBoolean("remember_dark_mode", isChecked).apply()
                 }
             }

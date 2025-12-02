@@ -18,13 +18,12 @@ import androidx.appcompat.app.AppCompatDelegate
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 🔹 先讀取 SharedPreferences
+
         val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         val darkModeOn = prefs.getBoolean("dark_mode", false)
         val rememberDarkMode = prefs.getBoolean("remember_dark_mode", true)
 
-        // 🔹 在 super.onCreate() 之前就決定主題
-        if (rememberDarkMode) {
+        if (rememberDarkMode || darkModeOn) {
             AppCompatDelegate.setDefaultNightMode(
                 if (darkModeOn) AppCompatDelegate.MODE_NIGHT_YES
                 else AppCompatDelegate.MODE_NIGHT_NO
