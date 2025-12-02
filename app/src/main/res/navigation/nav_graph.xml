@@ -21,5 +21,26 @@
         android:id="@+id/settingsFragment"
         android:name="com.example.garbage_truck.SettingsFragment"
         android:label="設定"
-        tools:layout="@layout/fragment_settings" />
+        tools:layout="@layout/fragment_settings" >
+        <action
+            android:id="@+id/action_settingsFragment_to_loginFragment"
+            app:destination="@id/loginFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.garbage_truck.LoginFragment"
+        android:label="登入"
+        tools:layout="@layout/fragment_login" >
+        <action
+            android:id="@+id/action_loginFragment_to_registerFragment"
+            app:destination="@id/registerFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/registerFragment"
+        android:name="com.example.garbage_truck.RegisterFragment"
+        android:label="註冊"
+        tools:layout="@layout/fragment_register" />
+
 </navigation>
