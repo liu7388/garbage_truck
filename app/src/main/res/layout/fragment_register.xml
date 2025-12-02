@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:padding="20dp"
     android:gravity="center_horizontal"
-    android:background="#FFFFFF"
+    android:background="?attr/colorSurface"
     android:clickable="true"
     android:focusable="true">
 
@@ -60,7 +60,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="取消"
-        android:backgroundTint="#CCCCCC"
+        android:backgroundTint="@android:color/darker_gray"
         android:layout_marginTop="10dp"/>
 
 </LinearLayout>
