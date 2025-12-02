@@ -259,6 +259,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun updateCityName(lat: Double, lng: Double) {
+        if (!isAdded) return
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
         try {
             val addresses = geocoder.getFromLocation(lat, lng, 1)

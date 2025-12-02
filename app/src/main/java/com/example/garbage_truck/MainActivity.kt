@@ -18,19 +18,17 @@ import androidx.appcompat.app.AppCompatDelegate
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 🔹 必須在 super.onCreate 之前設定，才會馬上套用主題
+
         val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         val darkModeOn = prefs.getBoolean("dark_mode", false)
         val rememberDarkMode = prefs.getBoolean("remember_dark_mode", true)
 
-        if (rememberDarkMode) {
-            if (darkModeOn) {
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            } else {
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            }
+        if (rememberDarkMode || darkModeOn) {
+            AppCompatDelegate.setDefaultNightMode(
+                if (darkModeOn) AppCompatDelegate.MODE_NIGHT_YES
+                else AppCompatDelegate.MODE_NIGHT_NO
+            )
         } else {
-            // 如果不記憶就讓系統自己決定
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         }
 
@@ -51,11 +49,7 @@ class MainActivity : AppCompatActivity() {
         bottomNavigationView.setupWithNavController(navController)
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            if (destination.id == R.id.mapFragment) {
-                fab.show()
-            } else {
-                fab.hide()
-            }
+            if (destination.id == R.id.mapFragment) fab.show() else fab.hide()
         }
 
         ActivityCompat.requestPermissions(
