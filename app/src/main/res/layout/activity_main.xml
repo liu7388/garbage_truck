@@ -47,8 +47,8 @@
         android:layout_marginEnd="24dp"
         android:layout_marginBottom="100dp"
         android:visibility="gone"
-        app:backgroundTint="@color/purple_500"
+        app:backgroundTint="?attr/colorPrimary"
         app:srcCompat="@drawable/ic_location"
-        app:tint="@android:color/white" />
+        app:tint="?attr/colorOnPrimary" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

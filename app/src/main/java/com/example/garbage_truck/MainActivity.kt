@@ -11,17 +11,37 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.core.app.ActivityCompat
 import android.Manifest
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.navigation.NavController
+
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var navController: NavController
+
     override fun onCreate(savedInstanceState: Bundle?) {
+
+        val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val darkModeOn = prefs.getBoolean("dark_mode", false)
+        val rememberDarkMode = prefs.getBoolean("remember_dark_mode", true)
+
+        if (rememberDarkMode || darkModeOn) {
+            AppCompatDelegate.setDefaultNightMode(
+                if (darkModeOn) AppCompatDelegate.MODE_NIGHT_YES
+                else AppCompatDelegate.MODE_NIGHT_NO
+            )
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
-        val navController = findNavController(R.id.nav_host_fragment)
+        navController = findNavController(R.id.nav_host_fragment)
         val bottomNavigationView = findViewById<BottomNavigationView>(R.id.bottom_navigation)
         val fab = findViewById<FloatingActionButton>(R.id.locationFab)
 
@@ -32,11 +52,7 @@ class MainActivity : AppCompatActivity() {
         bottomNavigationView.setupWithNavController(navController)
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            if (destination.id == R.id.mapFragment) {
-                fab.show()
-            } else {
-                fab.hide()
-            }
+            if (destination.id == R.id.mapFragment) fab.show() else fab.hide()
         }
 
         ActivityCompat.requestPermissions(
@@ -52,5 +68,9 @@ class MainActivity : AppCompatActivity() {
                 currentFragment.moveToMyLocation()
             }
         }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        return navController.navigateUp() || super.onSupportNavigateUp()
     }
 }
