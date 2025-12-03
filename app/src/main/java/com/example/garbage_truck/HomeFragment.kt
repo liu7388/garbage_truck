@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.CalendarContract
 import android.view.LayoutInflater
 import android.view.View
@@ -40,6 +42,18 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     private var nearestPointName: String = ""
     private var nearestArrive: String = ""
     private var nearestLeave: String = ""
+
+    private var arrivalAnimationDialog: ArrivalAnimationDialog? = null
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val truckCheckRunnable = object : Runnable {
+        override fun run() {
+            if (isAdded) {
+                checkIfTruckIsArriving(nearestArrive)
+                handler.postDelayed(this, 30000) // Check every 30 seconds
+            }
+        }
+    }
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -149,15 +163,22 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun parseTimeToMillis(time: String): Long {
-        if (time.length != 4) return System.currentTimeMillis()
-        val now = Calendar.getInstance()
-        val hour = time.substring(0, 2).toIntOrNull() ?: now.get(Calendar.HOUR_OF_DAY)
-        val min = time.substring(2, 4).toIntOrNull() ?: now.get(Calendar.MINUTE)
-        now.set(Calendar.HOUR_OF_DAY, hour)
-        now.set(Calendar.MINUTE, min)
-        now.set(Calendar.SECOND, 0)
-        now.set(Calendar.MILLISECOND, 0)
-        return now.timeInMillis
+        if (time.length != 4) return 0L
+        val arrivalTime = Calendar.getInstance()
+        val hour = time.substring(0, 2).toIntOrNull() ?: return 0L
+        val min = time.substring(2, 4).toIntOrNull() ?: return 0L
+
+        arrivalTime.set(Calendar.HOUR_OF_DAY, hour)
+        arrivalTime.set(Calendar.MINUTE, min)
+        arrivalTime.set(Calendar.SECOND, 0)
+        arrivalTime.set(Calendar.MILLISECOND, 0)
+
+        // If the parsed time is earlier than the current time, assume it's for the next day.
+        if (arrivalTime.timeInMillis < System.currentTimeMillis()) {
+            arrivalTime.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        return arrivalTime.timeInMillis
     }
 
     private fun enableMyLocation() {
@@ -194,11 +215,27 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 e.printStackTrace()
+                activity?.runOnUiThread {
+                    Toast.makeText(context, "無法取得垃圾車資料", Toast.LENGTH_SHORT).show()
+                }
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (_binding == null) return
-                val body = response.body?.string() ?: return
+                if (!response.isSuccessful) {
+                    activity?.runOnUiThread {
+                        Toast.makeText(context, "無法取得垃圾車資料", Toast.LENGTH_SHORT).show()
+                    }
+                    return
+                }
+
+                val body = response.body?.string()
+                if (body == null) {
+                    activity?.runOnUiThread {
+                        Toast.makeText(context, "無法取得垃圾車資料", Toast.LENGTH_SHORT).show()
+                    }
+                    return
+                }
+
                 val json = JSONObject(body)
                 val results = json.getJSONObject("result").getJSONArray("results")
 
@@ -245,9 +282,30 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
                     binding.tvArriveTime.text = "抵達時間：${formatTime(arrive)}"
                     binding.tvLeaveTime.text = "離開時間：${formatTime(leave)}"
+                    // Start the periodic check after fetching the data
+                    handler.post(truckCheckRunnable)
                 }
             }
         })
+    }
+
+    private fun checkIfTruckIsArriving(time: String) {
+        if (time.isBlank()) return
+        val arrivalMillis = parseTimeToMillis(time)
+        if (arrivalMillis == 0L) return
+
+        val currentMillis = System.currentTimeMillis()
+        val fiveMinutesInMillis = 5 * 60 * 1000
+
+        // Check if the arrival time is in the future and within the next 5 minutes
+        if (arrivalMillis > currentMillis && arrivalMillis - currentMillis <= fiveMinutesInMillis) {
+            if (arrivalAnimationDialog == null) {
+                arrivalAnimationDialog = ArrivalAnimationDialog()
+            }
+            if (arrivalAnimationDialog?.isAdded == false && !childFragmentManager.isStateSaved) {
+                arrivalAnimationDialog?.show(childFragmentManager, ArrivalAnimationDialog.TAG)
+            }
+        }
     }
 
     private fun formatTime(time: String): String {
@@ -281,17 +339,25 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
+        // Start checking when the fragment is resumed
+        handler.post(truckCheckRunnable)
     }
 
     override fun onPause() {
         super.onPause()
         binding.mapView.onPause()
+        // Stop checking when the fragment is paused
+        handler.removeCallbacks(truckCheckRunnable)
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        arrivalAnimationDialog?.dismissAllowingStateLoss()
+        arrivalAnimationDialog = null
         binding.mapView.onDestroy()
-        googleMap.clear()
+        if(this::googleMap.isInitialized) {
+            googleMap.clear()
+        }
         _binding = null
     }
 
