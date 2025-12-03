@@ -24,7 +24,6 @@ import com.google.android.gms.maps.model.Marker
 import android.widget.TextView
 import android.widget.Button
 
-
 class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     private var googleMap: GoogleMap? = null
@@ -106,7 +105,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
         moveToMyLocation()
 
-        map.setOnCameraIdleListener {
+        map.setOnCameraIdleListener { 
             val center = map.cameraPosition.target
             loadGarbageCarDataAroundUser(center)
         }
@@ -128,7 +127,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             infoCard.visibility = View.VISIBLE
             true
         }
-        map.setOnMapClickListener {
+        map.setOnMapClickListener { 
             infoCard.visibility = View.GONE
             selectedMarker = null
         }
@@ -143,17 +142,18 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 e.printStackTrace()
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     progressBar.visibility = View.GONE
                 }
             }
 
             override fun onResponse(call: Call, response: Response) {
+                if (!isAdded) return
                 val body = response.body?.string() ?: return
                 val json = JSONObject(body)
                 val results = json.getJSONObject("result").getJSONArray("results")
 
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     val newMarkers = mutableMapOf<String, LatLng>()
 
                     for (i in 0 until results.length()) {

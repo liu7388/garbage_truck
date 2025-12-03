@@ -2,6 +2,8 @@ import java.util.Properties
 import java.io.FileInputStream
 
 plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
@@ -16,21 +18,20 @@ if (localPropsFile.exists()) {
 
 android {
     namespace = "com.example.garbage_truck"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.garbage_truck"
         minSdk = 30
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
-        manifestPlaceholders["MAPS_API_KEY"] = properties.getProperty("MAPS_API_KEY", "")
-        manifestPlaceholders["WEATHER_API_KEY"] = properties.getProperty("WEATHER_API_KEY") ?: ""
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Please add your API keys to local.properties
+        manifestPlaceholders["MAPS_API_KEY"] = properties.getProperty("MAPS_API_KEY", "")
+        manifestPlaceholders["WEATHER_API_KEY"] = properties.getProperty("WEATHER_API_KEY", "")
     }
 
     buildTypes {
@@ -43,11 +44,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "1.8"
     }
 
     buildFeatures {
