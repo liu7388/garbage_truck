@@ -12,6 +12,11 @@
         android:title="主頁" />
 
     <item
+        android:id="@+id/classificationFragment"
+        android:icon="@drawable/ic_classification"
+        android:title="垃圾分類" />
+
+    <item
         android:id="@+id/settingsFragment"
         android:icon="@drawable/ic_settings"
         android:title="設定" />

@@ -18,6 +18,12 @@
         tools:layout="@layout/fragment_home" />
 
     <fragment
+        android:id="@+id/classificationFragment"
+        android:name="com.example.garbage_truck.ClassificationFragment"
+        android:label="垃圾分類輔助"
+        tools:layout="@layout/fragment_classification" />
+
+    <fragment
         android:id="@+id/settingsFragment"
         android:name="com.example.garbage_truck.SettingsFragment"
         android:label="設定"
