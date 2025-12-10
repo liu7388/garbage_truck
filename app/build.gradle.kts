@@ -88,4 +88,13 @@ dependencies {
 
     implementation ("com.github.bumptech.glide:glide:4.16.0")
     kapt ("com.github.bumptech.glide:compiler:4.12.0")
+
+    val camerax_version = "1.3.4"
+    implementation("androidx.camera:camera-core:$camerax_version")
+    implementation("androidx.camera:camera-camera2:$camerax_version")
+    implementation("androidx.camera:camera-lifecycle:$camerax_version")
+    implementation("androidx.camera:camera-view:$camerax_version")
+
+    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.0")
 }

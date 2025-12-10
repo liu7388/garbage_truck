@@ -6,15 +6,23 @@
     android:layout_height="match_parent"
     tools:context=".ClassificationFragment">
 
-    <TextView
-        android:id="@+id/text_classification_title"
+    <androidx.camera.view.PreviewView
+        android:id="@+id/viewFinder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Button
+        android:id="@+id/camera_capture_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="垃圾分類輔助"
-        android:textSize="24sp"
+        android:layout_marginBottom="120dp"
+        android:text="拍照"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
