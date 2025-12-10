@@ -1,14 +1,18 @@
 package com.example.garbage_truck
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.PorterDuff
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -166,10 +170,52 @@ class ClassificationFragment : Fragment() {
         }
 
         if (maxScoreIndex != -1) {
-            val resultText = "${labels[maxScoreIndex]} (${String.format("%.2f%%", maxScore * 100)})"
-            binding.textClassificationResult.text = resultText
+            val resultLabel = labels[maxScoreIndex]
+            val resultText = "$resultLabel (${String.format("%.2f%%", maxScore * 100)})"
+            val garbageType = when (resultLabel) {
+                "cardboard", "paper" -> "紙類"
+                "metal" -> "鐵鋁罐類"
+                "plastic" -> "塑膠類"
+                "glass" -> "玻璃類"
+                else -> "一般垃圾"
+            }
+            val isRecyclable = garbageType != "一般垃圾"
+
+            activity?.runOnUiThread {
+                val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_classification_result, null)
+                val iconImageView = dialogView.findViewById<ImageView>(R.id.iv_garbage_type_icon)
+                val resultTextView = dialogView.findViewById<TextView>(R.id.tv_classification_result)
+                val typeTextView = dialogView.findViewById<TextView>(R.id.tv_garbage_type)
+
+                if (isRecyclable) {
+                    iconImageView.setImageResource(R.drawable.ic_recycling)
+                    iconImageView.setColorFilter(ContextCompat.getColor(requireContext(), when (resultLabel) {
+                        "paper", "cardboard" -> R.color.recycled_paper
+                        "metal" -> R.color.recycled_metal
+                        "plastic" -> R.color.recycled_plastic
+                        "glass" -> R.color.recycled_glass
+                        else -> R.color.black
+                    }), PorterDuff.Mode.SRC_IN)
+                } else {
+                    iconImageView.setImageResource(R.drawable.ic_trash)
+                }
+
+                resultTextView.text = resultText
+                typeTextView.text = garbageType
+
+                AlertDialog.Builder(requireContext())
+                    .setView(dialogView)
+                    .setPositiveButton("確定", null)
+                    .show()
+            }
         } else {
-             binding.textClassificationResult.text = "Unknown"
+            activity?.runOnUiThread {
+                AlertDialog.Builder(requireContext())
+                    .setTitle("辨識結果")
+                    .setMessage("無法辨識")
+                    .setPositiveButton("確定", null)
+                    .show()
+            }
         }
     }
 
