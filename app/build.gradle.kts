@@ -63,6 +63,8 @@ dependencies {
 
     implementation("androidx.browser:browser:1.8.0")
 
+    implementation("com.google.firebase:firebase-messaging")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
