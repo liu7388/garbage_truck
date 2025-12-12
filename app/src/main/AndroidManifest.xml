@@ -2,11 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 權限宣告 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <uses-feature android:name="android.hardware.camera.any" />
 
@@ -21,10 +23,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Garbage_truck">
 
+        <!-- API Keys -->
         <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="garbage_truck_alert" />
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+        <meta-data
+            android:name="com.example.garbage_truck.WEATHER_API_KEY"
+            android:value="${WEATHER_API_KEY}" />
 
+        <!-- FCM Service -->
         <service
             android:name=".MyFirebaseMessagingService"
             android:exported="false">
@@ -33,28 +40,22 @@
             </intent-filter>
         </service>
 
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@android:color/holo_blue_dark" />
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
-        <meta-data
-            android:name="com.example.garbage_truck.WEATHER_API_KEY"
-            android:value="${WEATHER_API_KEY}" />
+        <!-- 本地鬧鐘的 Receiver -->
+        <receiver
+            android:name=".ArrivalAlarmReceiver"
+            android:exported="false" />
 
+        <!-- 主 Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop" >
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>

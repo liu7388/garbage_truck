@@ -1,10 +1,14 @@
 package com.example.garbage_truck
 
 import android.Manifest
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -48,9 +52,10 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     private val handler = Handler(Looper.getMainLooper())
     private val truckCheckRunnable = object : Runnable {
         override fun run() {
-            if (isAdded) {
+            if (isAdded && nearestArrive.isNotBlank()) {
+                // App 在前景時，持續檢查是否進入「前 5 分鐘」→ 播動畫
                 checkIfTruckIsArriving(nearestArrive)
-                handler.postDelayed(this, 30000) // Check every 30 seconds
+                handler.postDelayed(this, 30_000) // 每 30 秒檢查一次
             }
         }
     }
@@ -123,11 +128,15 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 .setMessage("要將 ${nearestPointName} 的垃圾車抵達時間加到行事曆嗎？")
                 .setPositiveButton("確定") { _, _ ->
                     val startMillis = parseTimeToMillis(nearestArrive)
-                    val endMillis = parseTimeToMillis(nearestLeave).let { if (it > startMillis) it else startMillis + 15 * 60 * 1000 }
+                    val endMillis =
+                        parseTimeToMillis(nearestLeave).let { if (it > startMillis) it else startMillis + 15 * 60 * 1000 }
 
                     val intent = Intent(Intent.ACTION_INSERT).apply {
                         data = CalendarContract.Events.CONTENT_URI
-                        putExtra(CalendarContract.Events.TITLE, "垃圾車抵達提醒: $nearestPointName")
+                        putExtra(
+                            CalendarContract.Events.TITLE,
+                            "垃圾車抵達提醒: $nearestPointName"
+                        )
                         putExtra(CalendarContract.Events.EVENT_LOCATION, nearestPointName)
                         putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, startMillis)
                         putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endMillis)
@@ -140,7 +149,8 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
         binding.btnMap.setOnClickListener {
             nearestPointLatLng?.let { latLng ->
-                val uri = Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}&mode=w")
+                val uri =
+                    Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}&mode=w")
                 val mapIntent = Intent(Intent.ACTION_VIEW, uri)
                 mapIntent.setPackage("com.google.android.apps.maps")
                 startActivity(mapIntent)
@@ -173,7 +183,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         arrivalTime.set(Calendar.SECOND, 0)
         arrivalTime.set(Calendar.MILLISECOND, 0)
 
-        // If the parsed time is earlier than the current time, assume it's for the next day.
+        // 如果時間早於現在，視為隔天的班
         if (arrivalTime.timeInMillis < System.currentTimeMillis()) {
             arrivalTime.add(Calendar.DAY_OF_YEAR, 1)
         }
@@ -268,6 +278,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
                 activity?.runOnUiThread {
                     if (_binding == null) return@runOnUiThread
+
                     nearestPointLatLng = LatLng(nearestLat, nearestLng)
                     nearestPointName = nearestName
                     nearestArrive = arrive
@@ -282,11 +293,91 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
                     binding.tvArriveTime.text = "抵達時間：${formatTime(arrive)}"
                     binding.tvLeaveTime.text = "離開時間：${formatTime(leave)}"
-                    // Start the periodic check after fetching the data
+
+                    // 🔔 安排「抵達前五分鐘」的鬧鐘（即使 App 關掉也會收到通知）
+                    scheduleArrivalAlarm(nearestArrive)
+
+                    // App 在前景時，同時用 Handler 做 30 秒輪詢，只負責顯示動畫
+                    handler.removeCallbacks(truckCheckRunnable)
                     handler.post(truckCheckRunnable)
                 }
             }
         })
+    }
+
+    /**
+     * 使用 AlarmManager 安排一次性鬧鐘，在抵達前 5 分鐘發出本機通知。
+     * 真正送通知的是 ArrivalAlarmReceiver。
+     */
+    private fun scheduleArrivalAlarm(arriveTime: String) {
+        if (arriveTime.length != 4) return
+
+        val arrivalMillis = parseTimeToMillis(arriveTime)
+        if (arrivalMillis == 0L) return
+
+        val fiveMinutesInMillis = 5 * 60 * 1000
+        val triggerAtMillis = arrivalMillis - fiveMinutesInMillis
+
+        val now = System.currentTimeMillis()
+        if (triggerAtMillis <= now) return  // 避免時間已過還排鬧鐘
+
+        val context = requireContext().applicationContext
+        val intent = Intent(context, ArrivalAlarmReceiver::class.java).apply {
+            putExtra("pointName", nearestPointName)
+        }
+
+        val pendingFlags =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            else
+                PendingIntent.FLAG_UPDATE_CURRENT
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            0,
+            intent,
+            pendingFlags
+        )
+
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerAtMillis,
+                        pendingIntent
+                    )
+                } else {
+                    // 沒拿到精準鬧鐘權限，就用較不精準的版本
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerAtMillis,
+                        pendingIntent
+                    )
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+                )
+            }
+        } catch (e: SecurityException) {
+            // 萬一還是被擋，退回一般 set，避免整個 App crash
+            alarmManager.set(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMillis,
+                pendingIntent
+            )
+        }
     }
 
     private fun checkIfTruckIsArriving(time: String) {
@@ -297,7 +388,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         val currentMillis = System.currentTimeMillis()
         val fiveMinutesInMillis = 5 * 60 * 1000
 
-        // Check if the arrival time is in the future and within the next 5 minutes
+        // 未來 5 分鐘內且還沒過
         if (arrivalMillis > currentMillis && arrivalMillis - currentMillis <= fiveMinutesInMillis) {
             if (arrivalAnimationDialog == null) {
                 arrivalAnimationDialog = ArrivalAnimationDialog()
@@ -305,6 +396,17 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             if (arrivalAnimationDialog?.isAdded == false && !childFragmentManager.isStateSaved) {
                 arrivalAnimationDialog?.show(childFragmentManager, ArrivalAnimationDialog.TAG)
             }
+        }
+    }
+
+    // 給 MainActivity 從通知點進來時呼叫，強迫顯示動畫
+    fun showArrivalAnimationFromNotification() {
+        if (!isAdded) return
+        if (arrivalAnimationDialog == null) {
+            arrivalAnimationDialog = ArrivalAnimationDialog()
+        }
+        if (arrivalAnimationDialog?.isAdded == false && !childFragmentManager.isStateSaved) {
+            arrivalAnimationDialog?.show(childFragmentManager, ArrivalAnimationDialog.TAG)
         }
     }
 
@@ -339,14 +441,13 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
-        // Start checking when the fragment is resumed
+        // 回到畫面時，再開始 30 秒輪詢（只為了顯示動畫）
         handler.post(truckCheckRunnable)
     }
 
     override fun onPause() {
         super.onPause()
         binding.mapView.onPause()
-        // Stop checking when the fragment is paused
         handler.removeCallbacks(truckCheckRunnable)
     }
 
@@ -355,7 +456,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         arrivalAnimationDialog?.dismissAllowingStateLoss()
         arrivalAnimationDialog = null
         binding.mapView.onDestroy()
-        if(this::googleMap.isInitialized) {
+        if (this::googleMap.isInitialized) {
             googleMap.clear()
         }
         _binding = null
