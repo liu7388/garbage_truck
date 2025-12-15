@@ -17,9 +17,9 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/garbage_truck"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/garbage_truck_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Garbage_truck">
 
@@ -30,6 +30,17 @@
         <meta-data
             android:name="com.example.garbage_truck.WEATHER_API_KEY"
             android:value="${WEATHER_API_KEY}" />
+
+        <!-- ✅ 將 MainActivity 重新設為 LAUNCHER -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <!-- FCM Service -->
         <service
@@ -44,17 +55,6 @@
         <receiver
             android:name=".ArrivalAlarmReceiver"
             android:exported="false" />
-
-        <!-- 主 Activity -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
 
     </application>
 

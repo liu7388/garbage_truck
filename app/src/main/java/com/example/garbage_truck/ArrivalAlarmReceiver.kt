@@ -55,7 +55,7 @@ class ArrivalAlarmReceiver : BroadcastReceiver() {
         val vibrationPattern = longArrayOf(0, 500, 250, 500)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.mipmap.garbage_truck)
             .setContentTitle("垃圾車即將抵達")
             .setContentText("距離 $pointName 約 5 分鐘，記得準備垃圾喔！")
             .setAutoCancel(true)

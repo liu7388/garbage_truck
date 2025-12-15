@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -72,6 +73,24 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             Toast.makeText(requireContext(), "未授予定位權限", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // 用於處理從「精準鬧鐘」權限設定頁面返回後的結果
+    private val exactAlarmPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // 從設定頁面回來後，再次檢查權限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = requireContext().getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            if (alarmManager.canScheduleExactAlarms()) {
+                // 如果使用者授予了權限，就重新安排一次鬧鐘
+                Toast.makeText(requireContext(), "已取得精準鬧鐘權限，將設定提醒", Toast.LENGTH_SHORT).show()
+                scheduleArrivalAlarm(nearestArrive)
+            } else {
+                Toast.makeText(requireContext(), "未授予精準鬧鐘權限，提醒可能延遲", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
 
     private fun updateAddress(lat: Double, lng: Double) {
         if (!isAdded) return
@@ -310,7 +329,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
      * 真正送通知的是 ArrivalAlarmReceiver。
      */
     private fun scheduleArrivalAlarm(arriveTime: String) {
-        if (arriveTime.length != 4) return
+        if (!isAdded || arriveTime.length != 4) return
 
         val arrivalMillis = parseTimeToMillis(arriveTime)
         if (arrivalMillis == 0L) return
@@ -349,13 +368,10 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                         triggerAtMillis,
                         pendingIntent
                     )
+                    Toast.makeText(requireContext(), "已設定抵達前 5 分鐘提醒", Toast.LENGTH_SHORT).show()
                 } else {
-                    // 沒拿到精準鬧鐘權限，就用較不精準的版本
-                    alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent
-                    )
+                    // 沒有權限，引導使用者去設定
+                    showExactAlarmPermissionDialog()
                 }
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
@@ -363,20 +379,48 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                     triggerAtMillis,
                     pendingIntent
                 )
+                Toast.makeText(requireContext(), "已設定抵達前 5 分鐘提醒", Toast.LENGTH_SHORT).show()
             } else {
                 alarmManager.setExact(
                     AlarmManager.RTC_WAKEUP,
                     triggerAtMillis,
                     pendingIntent
                 )
+                Toast.makeText(requireContext(), "已設定抵達前 5 分鐘提醒", Toast.LENGTH_SHORT).show()
             }
         } catch (e: SecurityException) {
+            Toast.makeText(requireContext(), "無法設定提醒，請檢查權限", Toast.LENGTH_SHORT).show()
             // 萬一還是被擋，退回一般 set，避免整個 App crash
             alarmManager.set(
                 AlarmManager.RTC_WAKEUP,
                 triggerAtMillis,
                 pendingIntent
             )
+        }
+    }
+
+    // 顯示對話框，向使用者解釋為何需要權限，並引導至設定頁
+    private fun showExactAlarmPermissionDialog() {
+        if (!isAdded) return
+        AlertDialog.Builder(requireContext())
+            .setTitle("需要「鬧鐘與提醒」權限")
+            .setMessage("為了準時在垃圾車抵達前 5 分鐘提醒您，應用程式需要「鬧鐘與提醒」權限。\n\n若未授予，提醒通知可能會延遲送達。")
+            .setPositiveButton("前往設定") { _, _ ->
+                requestExactAlarmPermission()
+            }
+            .setNegativeButton("暫不設定", null)
+            .show()
+    }
+
+    // 建立 Intent，開啟「鬧鐘與提醒」的設定頁面
+    private fun requestExactAlarmPermission() {
+        if (!isAdded) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                // 將使用者直接導向自己 App 的設定頁
+                data = Uri.fromParts("package", requireContext().packageName, null)
+            }
+            exactAlarmPermissionLauncher.launch(intent)
         }
     }
 

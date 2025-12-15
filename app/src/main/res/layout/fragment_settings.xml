@@ -57,11 +57,11 @@
 
             <Button
                 android:id="@+id/btn_logout"
+                style="@style/Widget.Material3.Button.OutlinedButton" 
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="登出帳號"
                 android:visibility="gone"
-                android:backgroundTint="@android:color/darker_gray"
                 android:layout_marginTop="15dp"/>
 
         </LinearLayout>

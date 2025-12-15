@@ -59,7 +59,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         createNotificationChannelIfNeeded()
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)   // 可以改成你自己的通知 icon
+            .setSmallIcon(R.mipmap.garbage_truck)   // 可以改成你自己的通知 icon
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)

@@ -75,7 +75,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="GitHub"
-            android:backgroundTint="#333333"
+            android:backgroundTint="#214274"
             android:layout_marginStart="5dp"/>
     </LinearLayout>
 

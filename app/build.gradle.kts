@@ -55,6 +55,9 @@ android {
 }
 
 dependencies {
+    // ❌ 移除 SplashScreen API 函式庫
+    // implementation("androidx.core:core-splashscreen:1.0.1")
+
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")

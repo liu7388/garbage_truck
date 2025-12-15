@@ -35,6 +35,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navController: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 移除了 installSplashScreen()
+
         Log.d(TAG, "🚀 MainActivity onCreate() 執行了")
 
         setupTheme()
@@ -47,7 +49,6 @@ class MainActivity : AppCompatActivity() {
 
         requestPermissionsInOrder()
 
-        // ✅ 檢查是否是從通知點擊進來，如果是就處理
         handleArrivalIntentIfNeeded(intent)
     }
 
@@ -160,24 +161,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ 修改後的方法，直接顯示 Dialog
     private fun handleArrivalIntentIfNeeded(intent: Intent?) {
         val shouldShowDialog = intent?.getBooleanExtra(ArrivalAlarmReceiver.EXTRA_SHOW_DIALOG, false) == true
 
         if (shouldShowDialog) {
             Log.d(TAG, "接收到指令，準備顯示 ArrivalAnimationDialog")
-            // 確保沒有舊的 Dialog 正在顯示
             supportFragmentManager.findFragmentByTag(ArrivalAnimationDialog.TAG)?.let {
                 (it as? ArrivalAnimationDialog)?.dismiss()
             }
-            // 顯示新的 Dialog
             ArrivalAnimationDialog().show(supportFragmentManager, ArrivalAnimationDialog.TAG)
-            // ✅ 用完就清除便條，避免 Activity 重建時重複觸發
             intent?.removeExtra(ArrivalAlarmReceiver.EXTRA_SHOW_DIALOG)
         }
     }
 
-    // ✅ 如果 App 已經在前景，從通知點擊會觸發這個
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent)
