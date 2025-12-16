@@ -61,6 +61,12 @@
             android:layout_height="wrap_content"
             android:id="@+id/btnNavigate"
             android:text="導航" />
+
+        <Button
+            android:id="@+id/btn_add_favorite"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="新增為最愛" />
     </LinearLayout>
 
 </FrameLayout>

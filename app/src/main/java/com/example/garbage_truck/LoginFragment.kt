@@ -80,7 +80,8 @@ class LoginFragment : Fragment() {
         // 按鈕監聽
         view.findViewById<Button>(R.id.btn_login_email).setOnClickListener { loginWithEmail() }
         view.findViewById<Button>(R.id.btn_register).setOnClickListener {
-            findNavController().navigate(R.id.action_loginFragment_to_registerFragment)
+            val action = LoginFragmentDirections.actionLoginFragmentToRegisterFragment()
+            findNavController().navigate(action)
         }
         view.findViewById<Button>(R.id.btn_login_google).setOnClickListener {
             googleSignInLauncher.launch(googleSignInClient.signInIntent)
