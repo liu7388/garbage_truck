@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -36,8 +37,6 @@ class FavoriteAddressFragment : Fragment() {
         setupRecyclerView()
         fetchFavoriteAddresses()
 
-        // The FAB is removed, so we don't need the click listener anymore.
-
         return binding.root
     }
 
@@ -47,20 +46,43 @@ class FavoriteAddressFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        favoriteAddressAdapter = FavoriteAddressAdapter(favoriteAddresses, onItemClicked = { address ->
-            val location = address.location
-            if (location != null) {
-                val action = FavoriteAddressFragmentDirections.actionFavoriteAddressFragmentToMapFragment(
-                    location.latitude.toFloat(),
-                    location.longitude.toFloat()
-                )
-                findNavController().navigate(action)
-            } else {
-                Log.w("FavoriteAddressFragment", "Address location is null: ${address.name}")
+        favoriteAddressAdapter = FavoriteAddressAdapter(
+            favoriteAddresses,
+            onItemClicked = { address ->
+                val location = address.location
+                if (location != null) {
+                    val action = FavoriteAddressFragmentDirections.actionFavoriteAddressFragmentToMapFragment(
+                        location.latitude.toFloat(),
+                        location.longitude.toFloat()
+                    )
+                    findNavController().navigate(action)
+                } else {
+                    Log.w("FavoriteAddressFragment", "Address location is null: ${address.name}")
+                }
+            },
+            onDeleteClicked = { address ->
+                deleteFavorite(address)
             }
-        })
+        )
         binding.recyclerViewFavoriteAddresses.adapter = favoriteAddressAdapter
         binding.recyclerViewFavoriteAddresses.layoutManager = LinearLayoutManager(context)
+    }
+
+    private fun deleteFavorite(address: FavoriteAddress) {
+        if (address.id.isEmpty()) {
+            Log.w("FavoriteAddressFragment", "Cannot delete favorite with empty ID")
+            Toast.makeText(context, "無法移除此項目", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        db.collection("favorites").document(address.id)
+            .delete()
+            .addOnSuccessListener {
+                Toast.makeText(context, "已從最愛移除", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "移除失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun fetchFavoriteAddresses() {

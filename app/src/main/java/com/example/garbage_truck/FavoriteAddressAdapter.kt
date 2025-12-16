@@ -8,7 +8,8 @@ import com.example.garbage_truck.databinding.ItemFavoriteAddressBinding
 
 class FavoriteAddressAdapter(
     private val favoriteAddresses: MutableList<FavoriteAddress>,
-    private val onItemClicked: (FavoriteAddress) -> Unit
+    private val onItemClicked: (FavoriteAddress) -> Unit,
+    private val onDeleteClicked: (FavoriteAddress) -> Unit
 ) : RecyclerView.Adapter<FavoriteAddressAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -24,6 +25,7 @@ class FavoriteAddressAdapter(
         val address = favoriteAddresses[position]
         holder.bind(address)
         holder.itemView.setOnClickListener { onItemClicked(address) }
+        holder.binding.btnDeleteFavorite.setOnClickListener { onDeleteClicked(address) }
     }
 
     override fun getItemCount(): Int = favoriteAddresses.size
@@ -34,7 +36,7 @@ class FavoriteAddressAdapter(
         notifyDataSetChanged()
     }
 
-    class ViewHolder(private val binding: ItemFavoriteAddressBinding) :
+    class ViewHolder(val binding: ItemFavoriteAddressBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(address: FavoriteAddress) {
