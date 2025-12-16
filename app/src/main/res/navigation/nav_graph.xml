@@ -24,7 +24,11 @@
         android:id="@+id/homeFragment"
         android:name="com.example.garbage_truck.HomeFragment"
         android:label="垃圾車清運查詢"
-        tools:layout="@layout/fragment_home" />
+        tools:layout="@layout/fragment_home" >
+        <action
+            android:id="@+id/action_homeFragment_to_mapFragment"
+            app:destination="@id/mapFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/classificationFragment"
@@ -40,9 +44,6 @@
         <action
             android:id="@+id/action_settingsFragment_to_loginFragment"
             app:destination="@id/loginFragment" />
-        <action
-            android:id="@+id/action_settingsFragment_to_favoriteAddressFragment"
-            app:destination="@id/favoriteAddressFragment" />
     </fragment>
 
     <fragment
@@ -60,24 +61,5 @@
         android:name="com.example.garbage_truck.RegisterFragment"
         android:label="註冊"
         tools:layout="@layout/fragment_register" />
-
-    <fragment
-        android:id="@+id/favoriteAddressFragment"
-        android:name="com.example.garbage_truck.FavoriteAddressFragment"
-        android:label="最愛地址"
-        tools:layout="@layout/fragment_favorite_address" >
-        <action
-            android:id="@+id/action_favoriteAddressFragment_to_mapFragment"
-            app:destination="@id/mapFragment" />
-        <action
-            android:id="@+id/action_favoriteAddressFragment_to_addFavoriteAddressFragment"
-            app:destination="@id/addFavoriteAddressFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/addFavoriteAddressFragment"
-        android:name="com.example.garbage_truck.AddFavoriteAddressFragment"
-        android:label="新增最愛地址"
-        tools:layout="@layout/fragment_add_favorite_address" />
 
 </navigation>

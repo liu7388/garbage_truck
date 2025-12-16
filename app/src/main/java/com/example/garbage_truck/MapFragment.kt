@@ -43,7 +43,6 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
     private lateinit var db: FirebaseFirestore
 
     private val args: MapFragmentArgs by navArgs()
-    private var targetLocationToShow: LatLng? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -129,12 +128,11 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
         }
 
-        // Check if we got coordinates from the favorite list
+        // Check if we got coordinates from another fragment
         if (args.latitude != 0f && args.longitude != 0f) {
-            targetLocationToShow = LatLng(args.latitude.toDouble(), args.longitude.toDouble())
-            googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocationToShow!!, 17f))
+            val targetLocation = LatLng(args.latitude.toDouble(), args.longitude.toDouble())
+            googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocation, 17f))
         } else {
-            // No coordinates passed, default to user's location
             moveToMyLocation()
         }
 
@@ -237,25 +235,6 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                             iterator.remove()
                         }
                     }
-
-                    targetLocationToShow?.let { target ->
-                        var foundMarker: Marker? = null
-                        for (marker in markerMap.values) {
-                            val distance = FloatArray(1)
-                            Location.distanceBetween(
-                                target.latitude, target.longitude,
-                                marker.position.latitude, marker.position.longitude,
-                                distance
-                            )
-                            if (distance[0] < 1.0f) { // 1 meter tolerance
-                                foundMarker = marker
-                                break
-                            }
-                        }
-                        foundMarker?.let { showMarkerInfo(it) }
-                        targetLocationToShow = null // Reset after use
-                    }
-
                     binding.progressBar.visibility = View.GONE
                 }
             }

@@ -46,12 +46,6 @@ class SettingsFragment : Fragment() {
             updateUI(null)
         }
 
-        // 設定「我的最愛清運點」按鈕
-        binding.btnFavoriteLocations.setOnClickListener {
-            val action = SettingsFragmentDirections.actionSettingsFragmentToFavoriteAddressFragment()
-            findNavController().navigate(action)
-        }
-
         // 從偏好設定取出已儲存的深色模式狀態
         val prefs = requireContext().getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         val darkModeOn = prefs.getBoolean("dark_mode", false)

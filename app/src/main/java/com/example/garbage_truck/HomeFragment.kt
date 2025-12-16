@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +18,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.garbage_truck.data.FavoriteAddress
 import com.example.garbage_truck.databinding.FragmentHomeBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -25,6 +29,9 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
@@ -54,6 +61,11 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             }
         }
     }
+
+    private lateinit var auth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore
+    private lateinit var favoriteAddressAdapter: FavoriteAddressAdapter
+    private val favoriteAddresses = mutableListOf<FavoriteAddress>()
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -108,10 +120,15 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         binding.mapView.getMapAsync(this)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+        auth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance()
 
         binding.tvCity.text = "定位中…"
         binding.tvTemperature.text = "30°C"
         binding.tvNearestSub.text = "..."
+
+        setupRecyclerView()
+        fetchFavoriteAddresses()
 
         binding.btnRemind.setOnClickListener {
             if (nearestPointName.isEmpty() || nearestArrive.isEmpty()) {
@@ -162,6 +179,69 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         )
     }
 
+    private fun setupRecyclerView() {
+        favoriteAddressAdapter = FavoriteAddressAdapter(
+            favoriteAddresses,
+            onItemClicked = { address ->
+                val location = address.location
+                if (location != null) {
+                    val action = HomeFragmentDirections.actionHomeFragmentToMapFragment(
+                        location.latitude.toFloat(),
+                        location.longitude.toFloat()
+                    )
+                    findNavController().navigate(action)
+                } else {
+                    Log.w("HomeFragment", "Address location is null: ${address.name}")
+                }
+            },
+            onDeleteClicked = { address ->
+                deleteFavorite(address)
+            }
+        )
+        binding.recyclerViewFavoriteAddresses.adapter = favoriteAddressAdapter
+        binding.recyclerViewFavoriteAddresses.layoutManager = LinearLayoutManager(context)
+    }
+
+    private fun deleteFavorite(address: FavoriteAddress) {
+        if (address.id.isEmpty()) {
+            Log.w("HomeFragment", "Cannot delete favorite with empty ID")
+            Toast.makeText(context, "無法移除此項目", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        db.collection("favorites").document(address.id)
+            .delete()
+            .addOnSuccessListener {
+                Toast.makeText(context, "已從最愛移除", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "移除失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun fetchFavoriteAddresses() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            db.collection("favorites")
+                .whereEqualTo("userId", currentUser.uid)
+                .addSnapshotListener { snapshots, e ->
+                    if (e != null) {
+                        Log.w("HomeFragment", "Listen failed.", e)
+                        return@addSnapshotListener
+                    }
+
+                    val addresses = mutableListOf<FavoriteAddress>()
+                    if (snapshots != null) {
+                        for (doc in snapshots) {
+                            val address = doc.toObject<FavoriteAddress>().copy(id = doc.id)
+                            addresses.add(address)
+                        }
+                    }
+                    favoriteAddressAdapter.updateData(addresses)
+                }
+        }
+    }
+
     private fun parseTimeToMillis(time: String): Long {
         if (time.length != 4) return 0L
         val arrivalTime = Calendar.getInstance()
@@ -173,7 +253,6 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         arrivalTime.set(Calendar.SECOND, 0)
         arrivalTime.set(Calendar.MILLISECOND, 0)
 
-        // If the parsed time is earlier than the current time, assume it's for the next day.
         if (arrivalTime.timeInMillis < System.currentTimeMillis()) {
             arrivalTime.add(Calendar.DAY_OF_YEAR, 1)
         }
@@ -256,6 +335,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
                     val distance = FloatArray(1)
                     android.location.Location.distanceBetween(myLat, myLng, lat, lng, distance)
+
                     if (distance[0] < minDistance) {
                         minDistance = distance[0]
                         nearestLat = lat
@@ -297,7 +377,6 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         val currentMillis = System.currentTimeMillis()
         val fiveMinutesInMillis = 5 * 60 * 1000
 
-        // Check if the arrival time is in the future and within the next 5 minutes
         if (arrivalMillis > currentMillis && arrivalMillis - currentMillis <= fiveMinutesInMillis) {
             if (arrivalAnimationDialog == null) {
                 arrivalAnimationDialog = ArrivalAnimationDialog()
