@@ -3,6 +3,7 @@ package com.example.garbage_truck
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -11,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.navArgs
 import com.example.garbage_truck.databinding.FragmentMapBinding
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -39,6 +41,9 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
+
+    private val args: MapFragmentArgs by navArgs()
+    private var targetLocationToShow: LatLng? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -124,7 +129,14 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
         }
 
-        moveToMyLocation()
+        // Check if we got coordinates from the favorite list
+        if (args.latitude != 0f && args.longitude != 0f) {
+            targetLocationToShow = LatLng(args.latitude.toDouble(), args.longitude.toDouble())
+            googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocationToShow!!, 17f))
+        } else {
+            // No coordinates passed, default to user's location
+            moveToMyLocation()
+        }
 
         map.setOnCameraIdleListener {
             val center = map.cameraPosition.target
@@ -132,26 +144,30 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
 
         map.setOnMarkerClickListener { marker ->
-            selectedMarker = marker
-            val info = marker.tag as? GarbageCarInfo
-            if (info != null) {
-                binding.tvTitle.text = info.title
-                binding.tvCarNo.text = "車號：${info.carNo}"
-                binding.tvCarTimes.text = "車次：${info.carTimes}"
-                binding.tvArriveLeave.text = "抵達 ${formatTime(info.arriveTime)} / 離開 ${formatTime(info.leaveTime)}"
-            } else {
-                binding.tvTitle.text = marker.title
-                binding.tvCarNo.text = ""
-                binding.tvCarTimes.text = ""
-                binding.tvArriveLeave.text = ""
-            }
-            binding.infoCard.visibility = View.VISIBLE
+            showMarkerInfo(marker)
             true
         }
         map.setOnMapClickListener {
             binding.infoCard.visibility = View.GONE
             selectedMarker = null
         }
+    }
+
+    private fun showMarkerInfo(marker: Marker) {
+        selectedMarker = marker
+        val info = marker.tag as? GarbageCarInfo
+        if (info != null) {
+            binding.tvTitle.text = info.title
+            binding.tvCarNo.text = "車號：${info.carNo}"
+            binding.tvCarTimes.text = "車次：${info.carTimes}"
+            binding.tvArriveLeave.text = "抵達 ${formatTime(info.arriveTime)} / 離開 ${formatTime(info.leaveTime)}"
+        } else {
+            binding.tvTitle.text = marker.title
+            binding.tvCarNo.text = ""
+            binding.tvCarTimes.text = ""
+            binding.tvArriveLeave.text = ""
+        }
+        binding.infoCard.visibility = View.VISIBLE
     }
 
     private fun loadGarbageCarDataAroundUser(center: LatLng) {
@@ -178,14 +194,13 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                     val newMarkers = mutableMapOf<String, LatLng>()
 
                     for (i in 0 until results.length()) {
-
                         val item = results.getJSONObject(i)
                         val lat = item.getString("緯度").toDouble()
                         val lng = item.getString("經度").toDouble()
                         val location = LatLng(lat, lng)
 
                         val distance = FloatArray(1)
-                        android.location.Location.distanceBetween(
+                        Location.distanceBetween(
                             center.latitude, center.longitude,
                             lat, lng, distance
                         )
@@ -221,6 +236,24 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                             entry.value.remove()
                             iterator.remove()
                         }
+                    }
+
+                    targetLocationToShow?.let { target ->
+                        var foundMarker: Marker? = null
+                        for (marker in markerMap.values) {
+                            val distance = FloatArray(1)
+                            Location.distanceBetween(
+                                target.latitude, target.longitude,
+                                marker.position.latitude, marker.position.longitude,
+                                distance
+                            )
+                            if (distance[0] < 1.0f) { // 1 meter tolerance
+                                foundMarker = marker
+                                break
+                            }
+                        }
+                        foundMarker?.let { showMarkerInfo(it) }
+                        targetLocationToShow = null // Reset after use
                     }
 
                     binding.progressBar.visibility = View.GONE
