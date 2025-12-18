@@ -95,19 +95,34 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                 return
             }
 
-            val favorite = hashMapOf(
-                "userId" to user.uid,
-                "name" to favoriteName,
-                "location" to GeoPoint(marker.position.latitude, marker.position.longitude)
-            )
+            val newLocation = GeoPoint(marker.position.latitude, marker.position.longitude)
 
             db.collection("favorites")
-                .add(favorite)
-                .addOnSuccessListener {
-                    Toast.makeText(requireContext(), "已新增至最愛清運點", Toast.LENGTH_SHORT).show()
+                .whereEqualTo("userId", user.uid)
+                .whereEqualTo("location", newLocation)
+                .get()
+                .addOnSuccessListener { documents ->
+                    if (documents.isEmpty) {
+                        val favorite = hashMapOf(
+                            "userId" to user.uid,
+                            "name" to favoriteName,
+                            "location" to newLocation
+                        )
+
+                        db.collection("favorites")
+                            .add(favorite)
+                            .addOnSuccessListener {
+                                Toast.makeText(requireContext(), "已新增至最愛清運點", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(requireContext(), "新增失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    } else {
+                        Toast.makeText(requireContext(), "此清運點已在最愛清單中", Toast.LENGTH_SHORT).show()
+                    }
                 }
                 .addOnFailureListener { e ->
-                    Toast.makeText(requireContext(), "新增失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "檢查重複時發生錯誤: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
         }
     }
