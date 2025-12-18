@@ -169,6 +169,12 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             loadGarbageCarDataAroundUser(center)
         }
 
+        map.setOnCameraMoveListener {
+            if (selectedMarker != null && binding.infoCard.visibility == View.VISIBLE) {
+                updateCardPosition()
+            }
+        }
+
         map.setOnMarkerClickListener { marker ->
             showMarkerInfo(marker)
             true
@@ -196,6 +202,20 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         binding.infoCard.visibility = View.VISIBLE
         binding.btnAddFavorite.text = "新增最愛"
         binding.btnAddFavorite.isEnabled = true
+        updateCardPosition()
+    }
+
+    private fun updateCardPosition() {
+        selectedMarker?.let { marker ->
+            googleMap?.projection?.toScreenLocation(marker.position)?.let { screenPos ->
+                binding.infoCard.post {
+                    val newX = screenPos.x - (binding.infoCard.width / 2f)
+                    val newY = screenPos.y - binding.infoCard.height - 100f // 100px margin
+                    binding.infoCard.x = newX
+                    binding.infoCard.y = newY
+                }
+            }
+        }
     }
 
     private fun loadGarbageCarDataAroundUser(center: LatLng) {
