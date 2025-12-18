@@ -18,7 +18,6 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
-import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
@@ -29,7 +28,7 @@ import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
 
-class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
+class MapFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
@@ -43,6 +42,7 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
     private lateinit var db: FirebaseFirestore
 
     private val args: MapFragmentArgs by navArgs()
+    private var targetLocationToShow: LatLng? = null // For showing info window automatically
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -54,9 +54,8 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val mapFragment =
-            childFragmentManager.findFragmentById(R.id.map) as? SupportMapFragment
-        mapFragment?.getMapAsync(this)
+        binding.map.onCreate(savedInstanceState)
+        binding.map.getMapAsync(this)
 
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
@@ -115,7 +114,6 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
-
         map.uiSettings.isMyLocationButtonEnabled = false
 
         if (ActivityCompat.checkSelfPermission(
@@ -128,10 +126,9 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
         }
 
-        // Check if we got coordinates from another fragment
         if (args.latitude != 0f && args.longitude != 0f) {
-            val targetLocation = LatLng(args.latitude.toDouble(), args.longitude.toDouble())
-            googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocation, 17f))
+            targetLocationToShow = LatLng(args.latitude.toDouble(), args.longitude.toDouble())
+            googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(targetLocationToShow!!, 17f))
         } else {
             moveToMyLocation()
         }
@@ -235,6 +232,31 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
                             iterator.remove()
                         }
                     }
+
+                    targetLocationToShow?.let { target ->
+                        var closestMarker: Marker? = null
+                        var minDistance = Float.MAX_VALUE
+
+                        for (marker in markerMap.values) {
+                            val distance = FloatArray(1)
+                            Location.distanceBetween(
+                                target.latitude, target.longitude,
+                                marker.position.latitude, marker.position.longitude,
+                                distance
+                            )
+                            if (distance[0] < minDistance) {
+                                minDistance = distance[0]
+                                closestMarker = marker
+                            }
+                        }
+
+                        if (minDistance < 10.0f) { // 10-meter tolerance
+                            closestMarker?.let { showMarkerInfo(it) }
+                        }
+
+                        targetLocationToShow = null // Reset regardless of whether a marker was found
+                    }
+
                     binding.progressBar.visibility = View.GONE
                 }
             }
@@ -259,9 +281,32 @@ class MapFragment : Fragment(R.layout.fragment_map), OnMapReadyCallback {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        binding.map.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.map.onPause()
+    }
+
     override fun onDestroyView() {
+        googleMap?.clear()
+        binding.map.onDestroy()
         super.onDestroyView()
         _binding = null
+        googleMap = null
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        binding.map.onLowMemory()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        binding.map.onSaveInstanceState(outState)
     }
 
     private fun formatTime(time: String): String {
