@@ -49,10 +49,29 @@ class MainActivity : AppCompatActivity() {
             setOf(R.id.homeFragment, R.id.mapFragment, R.id.settingsFragment)
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
-        bottomNavigationView.setupWithNavController(navController)
+
+        bottomNavigationView.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.homeFragment -> {
+                    navController.navigate(R.id.homeFragment)
+                    true
+                }
+                R.id.mapFragment -> {
+                    navController.navigate(R.id.mapFragment)
+                    true
+                }
+                R.id.settingsFragment -> {
+                    navController.navigate(R.id.settingsFragment)
+                    true
+                }
+                else -> false
+            }
+        }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
             if (destination.id == R.id.mapFragment) fab.show() else fab.hide()
+            // Update BottomNavigationView selected item
+            bottomNavigationView.menu.findItem(destination.id)?.isChecked = true
         }
 
         ActivityCompat.requestPermissions(
