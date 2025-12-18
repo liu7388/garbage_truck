@@ -3,6 +3,8 @@ package com.example.garbage_truck
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.location.Location
 import android.net.Uri
 import android.os.Bundle
@@ -18,6 +20,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
@@ -75,7 +78,11 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
 
         binding.btnAddFavorite.setOnClickListener {
-            addSelectedMarkerToFavorites()
+            if (binding.btnAddFavorite.text == "已新增最愛") {
+                Toast.makeText(requireContext(), "此清運點已新增過", Toast.LENGTH_SHORT).show()
+            } else {
+                addSelectedMarkerToFavorites()
+            }
         }
     }
 
@@ -89,25 +96,52 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         selectedMarker?.let { marker ->
             val info = marker.tag as? GarbageCarInfo
             val favoriteName = info?.title ?: marker.title
-
             if (favoriteName == null) {
                 Toast.makeText(requireContext(), "無法儲存此地點", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            val favorite = hashMapOf(
-                "userId" to user.uid,
-                "name" to favoriteName,
-                "location" to GeoPoint(marker.position.latitude, marker.position.longitude)
-            )
+            // Optimistic UI Update: Update the UI immediately without a "Processing" state.
+            Toast.makeText(requireContext(), "已新增最愛", Toast.LENGTH_SHORT).show()
+            binding.btnAddFavorite.text = "已新增最愛"
+
+            // Background Sync
+            val newLocation = GeoPoint(marker.position.latitude, marker.position.longitude)
 
             db.collection("favorites")
-                .add(favorite)
-                .addOnSuccessListener {
-                    Toast.makeText(requireContext(), "已新增至最愛清運點", Toast.LENGTH_SHORT).show()
+                .whereEqualTo("userId", user.uid)
+                .whereEqualTo("location", newLocation)
+                .limit(1)
+                .get()
+                .addOnSuccessListener { documents ->
+                    if (documents.isEmpty) {
+                        // It's a new favorite, so we add it.
+                        val favorite = hashMapOf(
+                            "userId" to user.uid,
+                            "name" to favoriteName,
+                            "location" to newLocation
+                        )
+                        db.collection("favorites").add(favorite)
+                            .addOnFailureListener { e ->
+                                // The write failed, so we revert the optimistic UI change.
+                                activity?.runOnUiThread {
+                                    Toast.makeText(requireContext(), "新增失敗，請稍後再試", Toast.LENGTH_SHORT).show()
+                                    if (selectedMarker == marker) {
+                                        binding.btnAddFavorite.text = "新增最愛"
+                                    }
+                                }
+                            }
+                    }
+                    // If documents is not empty, it was already a favorite. The UI is correct, so do nothing.
                 }
                 .addOnFailureListener { e ->
-                    Toast.makeText(requireContext(), "新增失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+                    // The check failed, so we revert the optimistic UI change.
+                    activity?.runOnUiThread {
+                        Toast.makeText(requireContext(), "操作失敗，請檢查網路連線", Toast.LENGTH_SHORT).show()
+                        if (selectedMarker == marker) {
+                            binding.btnAddFavorite.text = "新增最愛"
+                        }
+                    }
                 }
         }
     }
@@ -138,6 +172,12 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             loadGarbageCarDataAroundUser(center)
         }
 
+        map.setOnCameraMoveListener {
+            if (selectedMarker != null && binding.infoCard.visibility == View.VISIBLE) {
+                updateCardPosition()
+            }
+        }
+
         map.setOnMarkerClickListener { marker ->
             showMarkerInfo(marker)
             true
@@ -163,6 +203,22 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             binding.tvArriveLeave.text = ""
         }
         binding.infoCard.visibility = View.VISIBLE
+        binding.btnAddFavorite.text = "新增最愛"
+        binding.btnAddFavorite.isEnabled = true
+        updateCardPosition()
+    }
+
+    private fun updateCardPosition() {
+        selectedMarker?.let { marker ->
+            googleMap?.projection?.toScreenLocation(marker.position)?.let { screenPos ->
+                binding.infoCard.post {
+                    val newX = screenPos.x - (binding.infoCard.width / 2f)
+                    val newY = screenPos.y - binding.infoCard.height - 100f // 100px margin
+                    binding.infoCard.x = newX
+                    binding.infoCard.y = newY
+                }
+            }
+        }
     }
 
     private fun loadGarbageCarDataAroundUser(center: LatLng) {
@@ -187,6 +243,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
                 activity?.runOnUiThread {
                     val newMarkers = mutableMapOf<String, LatLng>()
+                    val originalBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_garbage_truck)
+                    val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, 100, 100, false)
+                    val garbageTruckIcon = BitmapDescriptorFactory.fromBitmap(scaledBitmap)
 
                     for (i in 0 until results.length()) {
                         val item = results.getJSONObject(i)
@@ -209,6 +268,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                                     MarkerOptions()
                                         .position(location)
                                         .title(item.getString("地點"))
+                                        .icon(garbageTruckIcon)
                                 )
                                 if (marker != null) {
                                     marker.tag = GarbageCarInfo(
