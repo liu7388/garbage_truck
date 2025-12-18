@@ -3,6 +3,8 @@ package com.example.garbage_truck
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.location.Location
 import android.net.Uri
 import android.os.Bundle
@@ -18,6 +20,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
@@ -240,6 +243,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
                 activity?.runOnUiThread {
                     val newMarkers = mutableMapOf<String, LatLng>()
+                    val originalBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_garbage_truck)
+                    val scaledBitmap = Bitmap.createScaledBitmap(originalBitmap, 100, 100, false)
+                    val garbageTruckIcon = BitmapDescriptorFactory.fromBitmap(scaledBitmap)
 
                     for (i in 0 until results.length()) {
                         val item = results.getJSONObject(i)
@@ -262,6 +268,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
                                     MarkerOptions()
                                         .position(location)
                                         .title(item.getString("地點"))
+                                        .icon(garbageTruckIcon)
                                 )
                                 if (marker != null) {
                                     marker.tag = GarbageCarInfo(
