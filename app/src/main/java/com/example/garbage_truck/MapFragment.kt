@@ -57,8 +57,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.map.onCreate(savedInstanceState)
-        binding.map.getMapAsync(this)
+        _binding?.map?.onCreate(savedInstanceState)
+        _binding?.map?.getMapAsync(this)
 
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
@@ -341,19 +341,29 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        _binding?.map?.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        _binding?.map?.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
-        binding.map.onResume()
+        _binding?.map?.onResume()
     }
 
     override fun onPause() {
         super.onPause()
-        binding.map.onPause()
+        _binding?.map?.onPause()
     }
 
     override fun onDestroyView() {
         googleMap?.clear()
-        binding.map.onDestroy()
+        _binding?.map?.onDestroy()
         super.onDestroyView()
         _binding = null
         googleMap = null
@@ -361,12 +371,14 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        binding.map.onLowMemory()
+        _binding?.map?.onLowMemory()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        binding.map.onSaveInstanceState(outState)
+        if (_binding != null) {
+            _binding!!.map.onSaveInstanceState(outState)
+        }
     }
 
     private fun formatTime(time: String): String {

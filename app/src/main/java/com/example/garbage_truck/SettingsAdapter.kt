@@ -74,10 +74,6 @@ class SettingsAdapter(
                 when (item.title) {
                     "深色模式" -> {
                         prefs.edit().putBoolean("dark_mode", isChecked).apply()
-                        AppCompatDelegate.setDefaultNightMode(
-                            if (isChecked) AppCompatDelegate.MODE_NIGHT_YES
-                            else AppCompatDelegate.MODE_NIGHT_NO
-                        )
                         val activity = (context as? Activity)
                         activity?.recreate()
                     }

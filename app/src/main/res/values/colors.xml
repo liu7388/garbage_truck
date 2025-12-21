@@ -1,15 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Base Colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="purple_500">#6200EE</color>
-    <color name="background_color">#F3F0F8</color>
+    
+    <!-- Greyscale -->
     <color name="gray_300">#E0E0E0</color>
     <color name="gray_700">#616161</color>
 
-    <!-- Recycling Colors -->
+    <!-- New Design Theme Colors -->
+    <color name="design_primary_green">#38761d</color>      <!-- 主色：深綠 -->
+    <color name="design_accent_orange">#FF6F00</color>      <!-- 輔色/高亮色：活力橘 -->
+    <color name="design_background_light">#F1F8E9</color> <!-- 底色：極淺的薄荷綠 -->
+    <color name="design_card_dark">#333333</color>        <!-- 深色卡片背景 -->
+    <color name="design_text_dark">#212121</color>       <!-- 深色文字 -->
+    <color name="design_text_light">#E0E0E0</color>      <!-- 淺色文字 -->
+
+    <!-- Recycling Colors (Kept for ClassificationFragment) -->
     <color name="recycled_paper">#4CAF50</color>
     <color name="recycled_metal">#2196F3</color>
     <color name="recycled_plastic">#F44336</color>
     <color name="recycled_glass">#3F51B5</color>
+
 </resources>

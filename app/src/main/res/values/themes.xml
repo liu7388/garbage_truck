@@ -1,9 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.Garbage_truck" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
-    </style>
+    <style name="Theme.Garbage_truck" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- ✅ 使用 深綠/活力橘 配色 (日間模式) -->
+        <item name="colorPrimary">@color/design_primary_green</item>
+        <item name="colorOnPrimary">@color/white</item>
 
-    <style name="Theme.Garbage_truck" parent="Base.Theme.Garbage_truck" />
+        <item name="colorSecondary">@color/design_accent_orange</item>
+        <item name="colorOnSecondary">@color/white</item>
+
+        <!-- 背景與文字顏色 -->
+        <item name="android:windowBackground">@color/design_background_light</item>
+        <item name="android:textColor">@color/design_text_dark</item>
+        <item name="colorOnSurface">@color/design_text_dark</item> <!-- Card 上的文字顏色 -->
+
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimary</item>
+    </style>
 </resources>
