@@ -75,13 +75,19 @@ class MainActivity : AppCompatActivity() {
         val fab = findViewById<FloatingActionButton>(R.id.locationFab)
 
         val appBarConfiguration = AppBarConfiguration(
-            setOf(R.id.homeFragment, R.id.mapFragment, R.id.settingsFragment)
+            setOf(
+                R.id.homeFragment, R.id.mapFragment, R.id.classificationFragment, R.id.settingsFragment
+            )
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
         bottomNavigationView.setupWithNavController(navController)
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            if (destination.id == R.id.mapFragment) fab.show() else fab.hide()
+            if (destination.id == R.id.mapFragment) {
+                fab.show()
+            } else {
+                fab.hide()
+            }
         }
 
         fab.setOnClickListener {

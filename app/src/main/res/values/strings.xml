@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">清運即時通</string>
     <string name="default_web_client_id">YOUR_WEB_CLIENT_ID</string>
+
+    <!-- Add Favorite Address Page -->
+    <string name="add_favorite_address_name_hint">名稱 (例如：家)</string>
+    <string name="add_favorite_address_address_hint">地址</string>
+    <string name="add_favorite_address_save_button">儲存</string>
 </resources>

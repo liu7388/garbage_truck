@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
 import android.provider.Settings
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +23,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.garbage_truck.data.FavoriteAddress
 import com.example.garbage_truck.databinding.FragmentHomeBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -30,6 +34,9 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.toObject
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
@@ -60,6 +67,11 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             }
         }
     }
+
+    private lateinit var auth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore
+    private lateinit var favoriteAddressAdapter: FavoriteAddressAdapter
+    private val favoriteAddresses = mutableListOf<FavoriteAddress>()
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -128,14 +140,19 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.mapView.onCreate(savedInstanceState)
-        binding.mapView.getMapAsync(this)
+        _binding?.mapView?.onCreate(savedInstanceState)
+        _binding?.mapView?.getMapAsync(this)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
+        auth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance()
 
         binding.tvCity.text = "定位中…"
         binding.tvTemperature.text = "30°C"
         binding.tvNearestSub.text = "..."
+
+        setupRecyclerView()
+        fetchFavoriteAddresses()
 
         binding.btnRemind.setOnClickListener {
             if (nearestPointName.isEmpty() || nearestArrive.isEmpty()) {
@@ -191,6 +208,69 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         )
     }
 
+    private fun setupRecyclerView() {
+        favoriteAddressAdapter = FavoriteAddressAdapter(
+            favoriteAddresses,
+            onItemClicked = { address ->
+                val location = address.location
+                if (location != null) {
+                    val action = HomeFragmentDirections.actionHomeFragmentToMapFragment(
+                        location.latitude.toFloat(),
+                        location.longitude.toFloat()
+                    )
+                    findNavController().navigate(action)
+                } else {
+                    Log.w("HomeFragment", "Address location is null: ${address.name}")
+                }
+            },
+            onDeleteClicked = { address ->
+                deleteFavorite(address)
+            }
+        )
+        binding.recyclerViewFavoriteAddresses.adapter = favoriteAddressAdapter
+        binding.recyclerViewFavoriteAddresses.layoutManager = LinearLayoutManager(context)
+    }
+
+    private fun deleteFavorite(address: FavoriteAddress) {
+        if (address.id.isEmpty()) {
+            Log.w("HomeFragment", "Cannot delete favorite with empty ID")
+            Toast.makeText(context, "無法移除此項目", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        db.collection("favorites").document(address.id)
+            .delete()
+            .addOnSuccessListener {
+                Toast.makeText(context, "已從最愛移除", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "移除失敗: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun fetchFavoriteAddresses() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            db.collection("favorites")
+                .whereEqualTo("userId", currentUser.uid)
+                .addSnapshotListener { snapshots, e ->
+                    if (e != null) {
+                        Log.w("HomeFragment", "Listen failed.", e)
+                        return@addSnapshotListener
+                    }
+
+                    val addresses = mutableListOf<FavoriteAddress>()
+                    if (snapshots != null) {
+                        for (doc in snapshots) {
+                            val address = doc.toObject<FavoriteAddress>().copy(id = doc.id)
+                            addresses.add(address)
+                        }
+                    }
+                    favoriteAddressAdapter.updateData(addresses)
+                }
+        }
+    }
+
     private fun parseTimeToMillis(time: String): Long {
         if (time.length != 4) return 0L
         val arrivalTime = Calendar.getInstance()
@@ -202,7 +282,6 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         arrivalTime.set(Calendar.SECOND, 0)
         arrivalTime.set(Calendar.MILLISECOND, 0)
 
-        // 如果時間早於現在，視為隔天的班
         if (arrivalTime.timeInMillis < System.currentTimeMillis()) {
             arrivalTime.add(Calendar.DAY_OF_YEAR, 1)
         }
@@ -285,6 +364,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
                     val distance = FloatArray(1)
                     android.location.Location.distanceBetween(myLat, myLng, lat, lng, distance)
+
                     if (distance[0] < minDistance) {
                         minDistance = distance[0]
                         nearestLat = lat
@@ -432,7 +512,6 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         val currentMillis = System.currentTimeMillis()
         val fiveMinutesInMillis = 5 * 60 * 1000
 
-        // 未來 5 分鐘內且還沒過
         if (arrivalMillis > currentMillis && arrivalMillis - currentMillis <= fiveMinutesInMillis) {
             if (arrivalAnimationDialog == null) {
                 arrivalAnimationDialog = ArrivalAnimationDialog()
@@ -482,16 +561,26 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        _binding?.mapView?.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        _binding?.mapView?.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
-        binding.mapView.onResume()
+        _binding?.mapView?.onResume()
         // 回到畫面時，再開始 30 秒輪詢（只為了顯示動畫）
         handler.post(truckCheckRunnable)
     }
 
     override fun onPause() {
         super.onPause()
-        binding.mapView.onPause()
+        _binding?.mapView?.onPause()
         handler.removeCallbacks(truckCheckRunnable)
     }
 
@@ -499,7 +588,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         super.onDestroyView()
         arrivalAnimationDialog?.dismissAllowingStateLoss()
         arrivalAnimationDialog = null
-        binding.mapView.onDestroy()
+        _binding?.mapView?.onDestroy()
         if (this::googleMap.isInitialized) {
             googleMap.clear()
         }
@@ -508,11 +597,13 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        binding.mapView.onLowMemory()
+        _binding?.mapView?.onLowMemory()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        binding.mapView.onSaveInstanceState(outState)
+        if (_binding != null) {
+            _binding!!.mapView.onSaveInstanceState(outState)
+        }
     }
 }
