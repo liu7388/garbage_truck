@@ -28,6 +28,10 @@ This is an Android application designed to help users track the real-time locati
     *   [Taipei City Government Open Data Platform](https://data.taipei/)
     *   [Central Weather Administration Open Data Platform](https://opendata.cwa.gov.tw/)
 
+## Machine Learning Model
+
+*   **TensorFlow Lite Model**: The app integrates a pre-trained TensorFlow Lite model for garbage classification. The model is sourced from [Kaggle](https://www.kaggle.com/code/vasantvohra1/using-cnn-test-accuracy-77/output?select=garbage.tflite).
+
 ## Setup and Run Instructions
 
 1.  **Clone the Project**
